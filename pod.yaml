@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: connect-server
+spec:
+  containers:
+    - name: connect-server
+      image: 
+      ports:
+        - containerPort: 2004

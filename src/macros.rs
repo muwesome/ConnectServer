@@ -1,0 +1,19 @@
+#[macro_export]
+macro_rules! opt_match {
+  ($expression:expr, $(|)* $pattern:pat $(|$pattern_extra:pat)* $(if $ifguard:expr)* => $result:expr) => {
+    match $expression {
+      $pattern $(|$pattern_extra)* $(if $ifguard)* => Some($result),
+      _ => None,
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! closet {
+  (@as_expr $e:expr) => { $e };
+
+  ([$($var:ident),*] $cl:expr) => {{
+    $(let $var = $var.clone();)*
+      $cl
+  }};
+}

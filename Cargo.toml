@@ -1,0 +1,24 @@
+[package]
+authors = ["Elliott Linder <elliott@linder.bz>"]
+name = "muwesome-connect-server"
+version = "0.1.0"
+build = "build.rs"
+
+[[bin]]
+doc = false
+name = "muwesome-cs"
+path = "src/bin/main.rs"
+
+[dependencies]
+grpcio = { version = "0.4.0", default-features = false, features = ["protobuf-codec"] }
+muonline-packet = { path = "../Packet/muonline-packet" }
+muonline-packet_codec = { path = "../Packet/muonline-packet_codec" }
+muonline-protocol = { path = "../Protocol" }
+evmap = "4.0.0"
+futures = "0.1.25"
+protobuf = "2.0"
+failure = "0.1.2"
+try_from = "0.2.2"
+
+[build-dependencies]
+protoc-grpcio = "0.2"
