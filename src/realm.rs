@@ -79,6 +79,7 @@ impl RealmBrowser {
   pub fn remove(&self, id: RealmServerId) -> Result<()> {
     let mut realms = self.lock()?;
     realms.empty(id);
+    realms.refresh();
     Ok(())
   }
 

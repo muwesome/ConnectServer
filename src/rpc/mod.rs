@@ -1,10 +1,8 @@
 use failure::{Context, Error, Fail, ResultExt};
 use futures::{sync::oneshot, Future, Stream};
 use grpcio::{ClientStreamingSink, Environment, RequestStream, RpcContext, RpcStatus, RpcStatusCode, ServerBuilder};
-use realm::{RealmBrowser, RealmServer, RealmServerId};
-use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc},
-  thread,
-};
+use realm::{RealmBrowser, RealmServer};
+use std::{sync::Arc, thread};
 use try_from::TryFrom;
 use Result;
 
@@ -63,54 +61,60 @@ impl proto::ConnectService for ConnectServiceImpl {
     stream: RequestStream<proto::RealmParams>,
     sink: ClientStreamingSink<proto::RealmResult>,
   ) {
-    let realms = self.realms.clone();
-    let realm_id = Arc::new(AtomicUsize::new(usize::max_value()));
-
-    let session = stream
+    let realm_stream = stream
+      // Apply context for any potential errors
       .map_err(|error| error.context("RPC receiving error").into())
       // Require the realm field to be specified
       .and_then(|input| {
         input
           .realm
           .ok_or_else(|| Context::new("Invalid input; realm must be specified").into())
-      }).into_future()
+      });
+
+    let await_realm_definition = realm_stream.into_future()
       // Discard the stream in case of an error
       .map_err(|(error, _)| error)
       // Wait for the first input; the realm definition
-      .and_then(closet!([realms, realm_id] move |(input, stream)| {
+      .and_then(|(input, stream)| {
         let input = input.ok_or_else(|| Context::new("Unexpected end of data"))?;
         let definition = opt_match!(input, proto::RealmParams_oneof_realm::definition(x) => x)
           .ok_or_else(|| Context::new("Invalid input; expected realm definition"))?;
 
         let realm = RealmServer::try_from(definition)
           .context("Invalid realm definition")?;
+        Ok((realm, stream))
+      });
 
-        realm_id.store(realm.id as usize, Ordering::SeqCst);
+    let realms = self.realms.clone();
+    let process_realm_updates = await_realm_definition
+      // Add the realm server to the browser
+      .and_then(closet!([realms] move |(realm, stream)| {
+        let realm_id = realm.id;
         realms.insert(realm)?;
         println!("Registered realm");
-        Ok(stream)
-      })).flatten_stream()
-      // Iterate over each realm status update
-      .for_each(closet!([realms, realm_id] move |input| {
-        let status = opt_match!(input, proto::RealmParams_oneof_realm::status(x) => x)
-          .ok_or_else(|| Context::new("Invalid input; expected realm status"))?;
-
-        realms.update(realm_id.load(Ordering::SeqCst) as RealmServerId, |realm| {
-          println!("Updated realm");
-          realm.clients = status.get_clients() as usize;
-          realm.capacity = status.get_capacity() as usize;
-        })
+        Ok((realm_id, stream))
       }))
-      // Remove the realm entry if it exists
-      .then(move |result| {
-        // TODO: Introduce 'tap/inspect_any' here?
-        let realm_id = realm_id.load(Ordering::SeqCst);
-        if realm_id != usize::max_value() {
+      // Wait for any realm updates
+      .and_then(move |(realm_id, stream)| {
+        // Iterate over each status update
+        stream.for_each(closet!([realms] move |input| {
+          let status = opt_match!(input, proto::RealmParams_oneof_realm::status(x) => x)
+            .ok_or_else(|| Context::new("Invalid input; expected realm status"))?;
+
+          realms.update(realm_id, |realm| {
+            println!("Updated realm");
+            realm.clients = status.get_clients() as usize;
+            realm.capacity = status.get_capacity() as usize;
+          })
+        })).then(move |result| {
+          // TODO: Introduce 'tap/inspect_any' here?
           println!("Unregistered realm");
-          realms.remove(realm_id as RealmServerId)?;
-        }
-        result
-      })
+          realms.remove(realm_id)?;
+          result
+        })
+      });
+
+    let send_response = process_realm_updates
       // Notify the client of the outcome
       .then(|result| {
         match result {
@@ -118,9 +122,13 @@ impl proto::ConnectService for ConnectServiceImpl {
           Err(error) => {
             // TODO: Identify and use proper RPC status code
             sink.fail(RpcStatus::new(RpcStatusCode::Unknown, Some(error.to_string())))
-          },
+          }
         }.map_err(|error| Error::from(error.context("RPC transmission error")))
-      }).map_err(|error| println!("TODO: LOG {:?}", error));
+      });
+
+    let session = send_response.map_err(|error| {
+      println!("TODO: LOG {:?}", error);
+    });
 
     // Dispatch the session
     ctx.spawn(session);
