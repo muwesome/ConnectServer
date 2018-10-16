@@ -1,9 +1,12 @@
-pub use self::builder::ServerBuilder;
-use self::service::{ClientService, RpcService};
+pub use crate::builder::ServerBuilder;
+use crate::observer::EventObserver;
+use crate::service::{ClientService, RpcService};
+use std::sync::{Arc, Mutex};
 
 #[macro_use]
 mod util;
 mod builder;
+mod observer;
 mod service;
 mod state;
 
@@ -28,6 +31,8 @@ type Result<T> = ::std::result::Result<T, failure::Error>;
 
 /// The server object.
 pub struct ConnectServer {
+  #[allow(dead_code)]
+  observer: Arc<Mutex<EventObserver>>,
   client_service: ClientService,
   rpc_service: RpcService,
 }

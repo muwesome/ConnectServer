@@ -53,7 +53,6 @@ impl proto::ConnectService for RpcListener {
       .and_then(closet!([realms] move |(realm, stream)| {
         let realm_id = realm.id;
         realms.add(realm)?;
-        println!("Registered realm");
         Ok((realm_id, stream))
       }))
       // Wait for any realm updates
@@ -62,15 +61,12 @@ impl proto::ConnectService for RpcListener {
         stream.for_each(closet!([realms] move |input| {
           let status = opt_match!(input, proto::RealmParams_oneof_realm::status(x) => x)
             .ok_or_else(|| Context::new("Invalid input; expected realm status"))?;
-
           realms.update(realm_id, |realm| {
-            println!("Updated realm");
             realm.clients = status.get_clients() as usize;
             realm.capacity = status.get_capacity() as usize;
           })
         })).then(move |result| {
           // TODO: Introduce 'tap/inspect_any' here?
-          println!("Unregistered realm");
           realms.remove(realm_id)?;
           result
         })

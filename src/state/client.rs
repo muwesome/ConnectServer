@@ -1,21 +1,29 @@
+use crate::util::{Dispatcher, Event, Listener};
 use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::{Context, ResultExt};
 use index_pool::IndexPool;
 use std::collections::hash_map::RandomState;
-use std::net::SocketAddrV4;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::{fmt, net::SocketAddrV4};
 
 pub type ClientId = usize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Client {
+  id: ClientId,
   socket: SocketAddrV4,
 }
 
 impl Client {
-  pub fn new(socket: SocketAddrV4) -> Self {
-    Client { socket }
+  pub fn new(id: ClientId, socket: SocketAddrV4) -> Self {
+    Client { id, socket }
+  }
+}
+
+impl fmt::Display for Client {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{} <{}>", &self.socket, self.id)
   }
 }
 
@@ -25,6 +33,15 @@ impl ShallowCopy for Client {
   }
 }
 
+pub enum ClientEvent {
+  Connect,
+  Disconnect,
+}
+
+impl Event for ClientEvent {
+  type Context = Client;
+}
+
 /// Realm server collection reader.
 type ClientReader = ReadHandle<ClientId, Client, (), RandomState>;
 
@@ -32,6 +49,7 @@ type ClientReader = ReadHandle<ClientId, Client, (), RandomState>;
 type ClientWriter = WriteHandle<ClientId, Client, (), RandomState>;
 
 struct ClientManagerInner {
+  dispatcher: Dispatcher<ClientEvent>,
   writer: ClientWriter,
   pool: IndexPool,
 }
@@ -45,30 +63,49 @@ pub struct ClientManager {
 impl ClientManager {
   pub fn new() -> Self {
     let (reader, writer) = evmap::new();
-    ClientManager {
-      reader,
-      inner: Arc::new(Mutex::new(ClientManagerInner {
-        pool: IndexPool::new(),
-        writer,
-      })),
-    }
+    let inner = Arc::new(Mutex::new(ClientManagerInner {
+      pool: IndexPool::new(),
+      dispatcher: Dispatcher::new(),
+      writer,
+    }));
+    ClientManager { reader, inner }
   }
 
-  pub fn add(&self, client: Client) -> Result<ClientId> {
+  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
+  where
+    L: Listener<ClientEvent> + Send + Sync + 'static,
+  {
     let mut inner = self.inner()?;
-    let client_id = inner.pool.new_id();
+    inner.dispatcher.add_listener(listener);
+    Ok(())
+  }
 
+  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId> {
+    let mut inner = self.inner()?;
+
+    let client_id = inner.pool.new_id();
+    let client = Client::new(client_id, socket);
+
+    inner.dispatcher.dispatch(&ClientEvent::Connect, &client);
     inner.writer.insert(client_id, client);
     inner.writer.refresh();
+
     Ok(client_id)
   }
 
   pub fn remove(&self, id: ClientId) -> Result<()> {
     let mut inner = self.inner()?;
+
     inner
       .pool
       .return_id(id)
       .context("Non existent client ID specified")?;
+
+    self.reader.get_and(&id, |client| {
+      let event = ClientEvent::Disconnect;
+      inner.dispatcher.dispatch(&event, &client[0]);
+    });
+
     inner.writer.empty(id);
     inner.writer.refresh();
     Ok(())

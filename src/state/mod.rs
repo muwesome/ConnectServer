@@ -1,5 +1,5 @@
-pub use self::client::{Client, ClientId, ClientManager};
-pub use self::realm::{RealmBrowser, RealmServer, RealmServerId};
+pub use self::client::{Client, ClientEvent, ClientId, ClientManager};
+pub use self::realm::{RealmBrowser, RealmEvent, RealmServer, RealmServerId};
 
 mod client;
 mod realm;

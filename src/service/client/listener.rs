@@ -1,4 +1,4 @@
-use crate::state::{Client, ClientManager, RealmBrowser};
+use crate::state::{ClientManager, RealmBrowser};
 use crate::Result;
 use failure::{Context, Fail, ResultExt};
 use futures::{sync::oneshot, Future, Stream};
@@ -46,7 +46,7 @@ pub fn serve(
 /// Setups and spawns a new task for a client.
 fn process_client(realms: &RealmBrowser, clients: &ClientManager, stream: TcpStream) -> Result<()> {
   // Try to add the client to the manager
-  let id = match clients.add(Client::new(ipv4socket(&stream)?)) {
+  let id = match clients.add(ipv4socket(&stream)?) {
     Ok(id) => id,
     Err(error) => {
       let _ = stream.shutdown(Shutdown::Both);

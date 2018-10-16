@@ -1,8 +1,9 @@
+use crate::util::{Dispatcher, Event, Listener};
 use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Context;
-use std::collections::hash_map::RandomState;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::{collections::hash_map::RandomState, fmt};
 
 /// A realm server identifier.
 pub type RealmServerId = u16;
@@ -23,6 +24,16 @@ impl RealmServer {
   }
 }
 
+impl fmt::Display for RealmServer {
+  fn fmt(&self, output: &mut fmt::Formatter) -> fmt::Result {
+    write!(
+      output,
+      "{}:{} <{}> [{}/{}]",
+      &self.host, self.port, self.id, self.clients, self.capacity
+    )
+  }
+}
+
 impl ShallowCopy for RealmServer {
   unsafe fn shallow_copy(&mut self) -> Self {
     RealmServer {
@@ -35,15 +46,30 @@ impl ShallowCopy for RealmServer {
   }
 }
 
+pub enum RealmEvent {
+  Register,
+  Deregister,
+  Update,
+}
+
+impl Event for RealmEvent {
+  type Context = RealmServer;
+}
+
 /// Realm server collection reader.
 type RealmReader = ReadHandle<RealmServerId, RealmServer, (), RandomState>;
 
 /// Realm server collection writer.
 type RealmWriter = WriteHandle<RealmServerId, RealmServer, (), RandomState>;
 
+struct RealmBrowserInner {
+  dispatcher: Dispatcher<RealmEvent>,
+  writer: RealmWriter,
+}
+
 #[derive(Clone)]
 pub struct RealmBrowser {
-  writer: Arc<Mutex<RealmWriter>>,
+  inner: Arc<Mutex<RealmBrowserInner>>,
   reader: RealmReader,
 }
 
@@ -51,41 +77,62 @@ impl RealmBrowser {
   pub fn new() -> Self {
     let (reader, writer) = evmap::new();
     RealmBrowser {
-      writer: Arc::new(Mutex::new(writer)),
       reader,
+      inner: Arc::new(Mutex::new(RealmBrowserInner {
+        dispatcher: Dispatcher::new(),
+        writer,
+      })),
     }
   }
 
-  pub fn add(&self, realm: RealmServer) -> Result<()> {
-    let mut realms = self.lock()?;
+  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
+  where
+    L: Listener<RealmEvent> + Send + Sync + 'static,
+  {
+    let mut inner = self.inner()?;
+    inner.dispatcher.add_listener(listener);
+    Ok(())
+  }
 
-    if realms.contains_key(&realm.id) {
+  pub fn add(&self, realm: RealmServer) -> Result<()> {
+    if self.reader.contains_key(&realm.id) {
       Err(Context::new("Duplicated realm ID entries"))?;
     }
 
-    realms.insert(realm.id, realm);
-    realms.refresh();
+    let mut inner = self.inner()?;
+    inner.dispatcher.dispatch(&RealmEvent::Register, &realm);
+    inner.writer.insert(realm.id, realm);
+    inner.writer.refresh();
     Ok(())
   }
 
   pub fn remove(&self, id: RealmServerId) -> Result<()> {
-    let mut realms = self.lock()?;
-    realms.empty(id);
-    realms.refresh();
+    let mut inner = self.inner()?;
+    self.reader.get_and(&id, |client| {
+      let event = RealmEvent::Deregister;
+      inner.dispatcher.dispatch(&event, &client[0]);
+    });
+    inner.writer.empty(id);
+    inner.writer.refresh();
     Ok(())
   }
 
-  pub fn update<F: FnOnce(&mut RealmServer)>(&self, id: RealmServerId, mutator: F) -> Result<()> {
+  pub fn update<F>(&self, id: RealmServerId, mutator: F) -> Result<()>
+  where
+    F: FnOnce(&mut RealmServer),
+  {
     // TODO: Use 'chashmap' instead to avoid cloning?
-    let mut realms = self.lock()?;
-    let mut realm = realms
+    let mut inner = self.inner()?;
+    let mut realm = inner
+      .writer
       .get_and(&id, |realm| realm[0].clone())
       .ok_or_else(|| Context::new("Non existent realm ID specified"))?;
 
+    inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
     mutator(&mut realm);
 
-    realms.update(id, realm);
-    realms.refresh();
+    inner.writer.update(id, realm);
+    inner.writer.refresh();
     Ok(())
   }
 
@@ -104,12 +151,12 @@ impl RealmBrowser {
     self.reader.len()
   }
 
-  fn lock(&self) -> Result<MutexGuard<RealmWriter>> {
+  fn inner(&self) -> Result<MutexGuard<RealmBrowserInner>> {
     Ok(
       self
-        .writer
+        .inner
         .lock()
-        .map_err(|_| Context::new("Realm writer deadlock"))?,
+        .map_err(|_| Context::new("Realm browser inner deadlock"))?,
     )
   }
 }
