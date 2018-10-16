@@ -1,60 +1,22 @@
+use super::proto;
+use crate::state::{RealmBrowser, RealmServer};
 use failure::{Context, Error, Fail, ResultExt};
-use futures::{sync::oneshot, Future, Stream};
-use grpcio::{ClientStreamingSink, Environment, RequestStream, RpcContext, RpcStatus, RpcStatusCode, ServerBuilder};
-use realm::{RealmBrowser, RealmServer};
-use std::{sync::Arc, thread};
+use futures::{Future, Stream};
+use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatusCode};
 use try_from::TryFrom;
-use Result;
-
-mod ctl;
-mod proto;
-
-pub struct ConnectService(ctl::ThreadController);
-
-impl ConnectService {
-  pub fn spawn<S: Into<String>>(host: S, port: u16, realms: RealmBrowser) -> Result<Self> {
-    let service = proto::create_connect_service(ConnectServiceImpl { realms });
-
-    let host = host.into();
-    let environment = Arc::new(Environment::new(1));
-
-    let mut server = ServerBuilder::new(environment)
-      .register_service(service)
-      .bind(host.clone(), port)
-      .build()
-      .context("Failed to build service")?;
-
-    let (tx, rx) = oneshot::channel();
-    let handle = thread::spawn(move || {
-      server.start();
-      println!("RPC listening on {}:{}", &host, port);
-
-      rx.wait().context("Thread transmitter closed prematurely")?;
-      server
-        .shutdown()
-        .wait()
-        .context("Error whilst shutting down service")
-        .map_err(From::from)
-    });
-
-    Ok(ConnectService(ctl::ThreadController::new(tx, handle)))
-  }
-
-  pub fn wait(self) -> Result<()> {
-    self.0.wait()
-  }
-
-  pub fn stop(self) -> Result<()> {
-    self.0.stop()
-  }
-}
 
 #[derive(Clone)]
-struct ConnectServiceImpl {
+pub struct RpcListener {
   realms: RealmBrowser,
 }
 
-impl proto::ConnectService for ConnectServiceImpl {
+impl RpcListener {
+  pub fn new(realms: RealmBrowser) -> Self {
+    RpcListener { realms }
+  }
+}
+
+impl proto::ConnectService for RpcListener {
   fn register_realm(
     &self,
     ctx: RpcContext,
@@ -90,7 +52,7 @@ impl proto::ConnectService for ConnectServiceImpl {
       // Add the realm server to the browser
       .and_then(closet!([realms] move |(realm, stream)| {
         let realm_id = realm.id;
-        realms.insert(realm)?;
+        realms.add(realm)?;
         println!("Registered realm");
         Ok((realm_id, stream))
       }))

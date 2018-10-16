@@ -1,7 +1,7 @@
+use crate::Result;
 use failure::Context;
 use futures::sync::oneshot;
 use std::thread;
-use Result;
 
 pub struct ThreadController(Option<(oneshot::Sender<()>, thread::JoinHandle<Result<()>>)>);
 

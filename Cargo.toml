@@ -1,12 +1,13 @@
 [package]
 authors = ["Elliott Linder <elliott@linder.bz>"]
-name = "muwesome-connect-server"
+name = "mucs"
 version = "0.1.0"
 build = "build.rs"
+edition = "2018"
 
 [[bin]]
 doc = false
-name = "muwesome-cs"
+name = "mu-cs"
 path = "src/bin/main.rs"
 
 [dependencies]
@@ -19,6 +20,8 @@ futures = "0.1.25"
 protobuf = "2.0"
 failure = "0.1.2"
 try_from = "0.2.2"
+tokio = "0.1.11"
+index-pool = "1.0.11"
 
 [build-dependencies]
 protoc-grpcio = "0.2"

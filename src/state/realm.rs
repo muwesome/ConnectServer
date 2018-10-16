@@ -1,8 +1,8 @@
+use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Context;
 use std::collections::hash_map::RandomState;
 use std::sync::{Arc, Mutex, MutexGuard};
-use Result;
 
 /// A realm server identifier.
 pub type RealmServerId = u16;
@@ -15,6 +15,12 @@ pub struct RealmServer {
   pub port: u16,
   pub clients: usize,
   pub capacity: usize,
+}
+
+impl RealmServer {
+  pub fn load_factor(&self) -> f32 {
+    self.clients as f32 / self.capacity as f32
+  }
 }
 
 impl ShallowCopy for RealmServer {
@@ -50,7 +56,7 @@ impl RealmBrowser {
     }
   }
 
-  pub fn insert(&self, realm: RealmServer) -> Result<()> {
+  pub fn add(&self, realm: RealmServer) -> Result<()> {
     let mut realms = self.lock()?;
 
     if realms.contains_key(&realm.id) {
@@ -58,6 +64,13 @@ impl RealmBrowser {
     }
 
     realms.insert(realm.id, realm);
+    realms.refresh();
+    Ok(())
+  }
+
+  pub fn remove(&self, id: RealmServerId) -> Result<()> {
+    let mut realms = self.lock()?;
+    realms.empty(id);
     realms.refresh();
     Ok(())
   }
@@ -76,11 +89,19 @@ impl RealmBrowser {
     Ok(())
   }
 
-  pub fn remove(&self, id: RealmServerId) -> Result<()> {
-    let mut realms = self.lock()?;
-    realms.empty(id);
-    realms.refresh();
-    Ok(())
+  pub fn for_each<F: FnMut(&RealmServer)>(&self, mut func: F) {
+    self.reader.for_each(|_, realm| func(&realm[0]));
+  }
+
+  pub fn get<R, F: FnOnce(&RealmServer) -> R>(&self, id: RealmServerId, func: F) -> Result<R> {
+    self
+      .reader
+      .get_and(&id, |realm| func(&realm[0]))
+      .ok_or_else(|| Context::new("Non existent realm ID specified").into())
+  }
+
+  pub fn len(&self) -> usize {
+    self.reader.len()
   }
 
   fn lock(&self) -> Result<MutexGuard<RealmWriter>> {

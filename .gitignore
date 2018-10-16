@@ -1,4 +1,4 @@
 target/
 Cargo.lock
-src/rpc/proto/*
-!src/rpc/proto/mod.rs
+src/service/rpc/proto/*
+!src/service/rpc/proto/mod.rs

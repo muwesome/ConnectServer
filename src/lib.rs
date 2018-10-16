@@ -1,26 +1,35 @@
-extern crate evmap;
-extern crate failure;
-extern crate futures;
-extern crate grpcio;
-extern crate protobuf;
-extern crate try_from;
-
-use builder::ServerBuilder;
-use realm::RealmBrowser;
-use rpc::ConnectService;
+pub use self::builder::ServerBuilder;
+use self::service::{ClientService, RpcService};
 
 #[macro_use]
-mod macros;
+mod util;
 mod builder;
-mod realm;
-mod rpc;
+mod service;
+mod state;
+
+// TODO: Use structured logging
+// TODO: Add tons of logging
+// TODO: Improve error reporting:
+// - Improved messages
+// - Customized types
+// - RPC status codes
+// TODO: Configurations
+// - DisconnectOnUnknownPacket
+// - Client IP & PORT
+// - Client timeout
+// - RPC IP & PORT
+// - Max packet size
+// - Max connections (global)
+// - Max connections (per IP)
+// - Max server list/ip requests?
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;
 
 /// The server object.
 pub struct ConnectServer {
-  rpc_service: ConnectService,
+  client_service: ClientService,
+  rpc_service: RpcService,
 }
 
 impl ConnectServer {
@@ -36,16 +45,15 @@ impl ConnectServer {
 
   /// Stops the server.
   pub fn stop(self) -> Result<()> {
-    //let result = self.client_service.stop();
-    self.rpc_service.stop()
-    //result
+    let result = self.client_service.stop();
+    self.rpc_service.stop()?;
+    result
   }
 
   /// Will block, waiting for the server to finish.
   pub fn wait(self) -> Result<()> {
-    //let result = self.connect_service.wait();
-    // TODO: Should just stop
-    self.rpc_service.wait()
-    //result
+    let result = self.client_service.wait();
+    self.rpc_service.stop()?;
+    result
   }
 }
