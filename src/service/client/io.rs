@@ -3,7 +3,7 @@ use failure::{Context, ResultExt};
 use muonline_packet::{Packet, PacketEncodable};
 use muonline_protocol::connect::{self, server, Client};
 
-pub fn process(realms: &RealmBrowser, packet: Packet) -> Result<Packet> {
+pub fn process(realms: &RealmBrowser, packet: &Packet) -> Result<Packet> {
   // TODO: Simplify error handling & conversion
   // TODO: Require 'ConnectServerRequest' before other packets
   match Client::from_packet(&packet)? {

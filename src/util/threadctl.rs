@@ -8,9 +8,11 @@ struct ThreadControllerInner {
   thread: JoinHandle<Result<()>>,
 }
 
+/// Controller for managing a thread.
 pub struct ThreadController(Option<ThreadControllerInner>);
 
 impl ThreadController {
+  /// Spawns a thread and returns its controller.
   pub fn spawn<F>(closure: F) -> Self
   where
     F: FnOnce(oneshot::Receiver<()>) -> Result<()> + Send + 'static,
@@ -20,6 +22,7 @@ impl ThreadController {
     ThreadController(Some(ThreadControllerInner { close_tx, thread }))
   }
 
+  /// Returns whether the thread is still alive or not.
   pub fn is_alive(&self) -> bool {
     self
       .0
@@ -27,6 +30,7 @@ impl ThreadController {
       .map_or(false, |inner| !inner.close_tx.is_canceled())
   }
 
+  /// Waits for the thread to finish.
   pub fn wait(mut self) -> Result<()> {
     if let Some(inner) = self.0.take() {
       Self::join_thread(inner.thread)?;
@@ -34,6 +38,7 @@ impl ThreadController {
     Ok(())
   }
 
+  /// Sends a stop signal and waits for the thread to exit.
   pub fn stop(mut self) -> Result<()> {
     self.stop_and_join_thread()
   }

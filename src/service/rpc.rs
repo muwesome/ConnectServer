@@ -11,7 +11,7 @@ pub struct RpcService(ThreadController);
 
 impl RpcService {
   pub fn spawn<S: Into<String>>(host: S, port: u16, realms: RealmBrowser) -> Result<Self> {
-    let service = proto::create_connect_service(listener::RpcListener::new(realms));
+    let service = proto::create_realm_service(listener::RpcListener::new(realms));
 
     let environment = Arc::new(Environment::new(1));
     let server = ServerBuilder::new(environment)

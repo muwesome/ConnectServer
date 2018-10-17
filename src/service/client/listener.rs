@@ -34,9 +34,7 @@ pub fn serve(
     // Apply context for any errors
     .map_err(|error| error.context("Client stream error").into())
     // Process each new client connection
-    .for_each(closet!([realms, clients] move |stream| {
-      serve_client(&realms, &clients, stream)
-    }))
+    .for_each(move |stream| serve_client(&realms, &clients, stream))
     // Listen for any cancellation events from the controller
     .select(close_signal);
 
@@ -67,11 +65,11 @@ fn serve_client(realms: &RealmBrowser, clients: &ClientPool, stream: TcpStream) 
     .split();
 
   // TODO: Connection reset by peer is expected
-  let client = reader
+  let session = reader
     // Apply context for any errors
     .map_err(|error| error.context("Client sink error").into())
     // Each packet received maps to a response packet
-    .and_then(closet!([realms] move |packet| super::io::process(&realms, packet)))
+    .and_then(closet!([realms] move |packet| super::io::process(&realms, &packet)))
     // Send each response packet to the client
     .forward(writer)
     // Remove the client from the service state
@@ -83,7 +81,7 @@ fn serve_client(realms: &RealmBrowser, clients: &ClientPool, stream: TcpStream) 
 
   // Spawn each client on an executor
   tokio::spawn(
-    client
+    session
       .map(|_| ())
       .map_err(|error| println!("Connect Client: {:?}", error)),
   );

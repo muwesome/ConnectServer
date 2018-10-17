@@ -2,16 +2,16 @@ use crate::{state, Result};
 use failure::{Error, ResultExt};
 use try_from::TryFrom;
 
-pub use self::connectservice::*;
-pub use self::connectservice_grpc::*;
+pub use self::connectserver::*;
+pub use self::connectserver_grpc::*;
 
-mod connectservice;
-mod connectservice_grpc;
+mod connectserver;
+mod connectserver_grpc;
 
-impl TryFrom<RealmDefinition> for state::RealmServer {
+impl TryFrom<RealmParams_RealmDefinition> for state::RealmServer {
   type Err = Error;
 
-  fn try_from(definition: RealmDefinition) -> Result<Self> {
+  fn try_from(definition: RealmParams_RealmDefinition) -> Result<Self> {
     let status = definition.get_status();
 
     // TODO: Validate more? (e.g clients <= capacity, host == ip/domain)

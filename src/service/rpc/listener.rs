@@ -16,7 +16,7 @@ impl RpcListener {
   }
 }
 
-impl proto::ConnectService for RpcListener {
+impl proto::RealmService for RpcListener {
   fn register_realm(
     &self,
     ctx: RpcContext,
@@ -27,9 +27,9 @@ impl proto::ConnectService for RpcListener {
       // Apply context for any potential errors
       .map_err(|error| error.context("RPC receiving error").into())
       // Require the realm field to be specified
-      .and_then(|input| {
-        input
-          .realm
+      .and_then(|realm| {
+        realm
+          .kind
           .ok_or_else(|| Context::new("Invalid input; realm must be specified").into())
       });
 
@@ -39,7 +39,7 @@ impl proto::ConnectService for RpcListener {
       // Wait for the first input; the realm definition
       .and_then(|(input, stream)| {
         let input = input.ok_or_else(|| Context::new("Unexpected end of data"))?;
-        let definition = opt_match!(input, proto::RealmParams_oneof_realm::definition(x) => x)
+        let definition = opt_match!(input, proto::RealmParams_oneof_kind::definition(x) => x)
           .ok_or_else(|| Context::new("Invalid input; expected realm definition"))?;
 
         let realm = RealmServer::try_from(definition)
@@ -59,7 +59,7 @@ impl proto::ConnectService for RpcListener {
       .and_then(move |(realm_id, stream)| {
         // Iterate over each status update
         stream.for_each(closet!([realms] move |input| {
-          let status = opt_match!(input, proto::RealmParams_oneof_realm::status(x) => x)
+          let status = opt_match!(input, proto::RealmParams_oneof_kind::status(x) => x)
             .ok_or_else(|| Context::new("Invalid input; expected realm status"))?;
           realms.update(realm_id, |realm| {
             realm.clients = status.get_clients() as usize;

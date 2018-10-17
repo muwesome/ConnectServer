@@ -18,9 +18,7 @@ mod state;
 // - RPC status codes
 // TODO: Configurations
 // - DisconnectOnUnknownPacket
-// - Client IP & PORT
 // - Client timeout
-// - RPC IP & PORT
 // - Max packet size
 // - Max connections (global)
 // - Max connections (per IP)
