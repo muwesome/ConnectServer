@@ -17,6 +17,7 @@ impl ThreadController {
   where
     F: FnOnce(oneshot::Receiver<()>) -> Result<()> + Send + 'static,
   {
+    // TODO: Use cloneable close signal from here?
     let (close_tx, close_rx) = oneshot::channel();
     let thread = thread::spawn(move || closure(close_rx));
     ThreadController(Some(ThreadControllerInner { close_tx, thread }))

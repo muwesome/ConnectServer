@@ -96,10 +96,7 @@ impl ClientPool {
   pub fn remove(&self, id: ClientId) -> Result<()> {
     let mut inner = self.inner()?;
 
-    inner
-      .pool
-      .return_id(id)
-      .context("Non existent client ID specified")?;
+    inner.pool.return_id(id).context("Non existent client ID")?;
 
     self.reader.get_and(&id, |client| {
       let event = ClientEvent::Disconnect;

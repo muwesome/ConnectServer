@@ -1,4 +1,14 @@
 #[macro_export]
+macro_rules! matches {
+  ($expression:expr, $($pattern:tt)+) => {
+    match $expression {
+      $($pattern)+ => true,
+      _ => false
+    }
+  }
+}
+
+#[macro_export]
 macro_rules! opt_match {
   ($expression:expr, $(|)* $pattern:pat $(|$pattern_extra:pat)* $(if $ifguard:expr)* => $result:expr) => {
     match $expression {

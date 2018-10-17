@@ -96,7 +96,7 @@ impl RealmBrowser {
 
   pub fn add(&self, realm: RealmServer) -> Result<()> {
     if self.reader.contains_key(&realm.id) {
-      Err(Context::new("Duplicated realm ID entries"))?;
+      Err(Context::new("Duplicated realm IDs"))?;
     }
 
     let mut inner = self.inner()?;
@@ -126,7 +126,7 @@ impl RealmBrowser {
     let mut realm = inner
       .writer
       .get_and(&id, |realm| realm[0].clone())
-      .ok_or_else(|| Context::new("Non existent realm ID specified"))?;
+      .ok_or_else(|| Context::new("Non existent realm ID"))?;
 
     inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
     mutator(&mut realm);
@@ -144,7 +144,7 @@ impl RealmBrowser {
     self
       .reader
       .get_and(&id, |realm| func(&realm[0]))
-      .ok_or_else(|| Context::new("Non existent realm ID specified").into())
+      .ok_or_else(|| Context::new("Non existent realm ID").into())
   }
 
   pub fn len(&self) -> usize {
