@@ -10,6 +10,7 @@ mod observer;
 mod service;
 mod state;
 
+// TODO: Quit if any service fails
 // TODO: Use structured logging
 // TODO: Add tons of logging
 // TODO: Improve error reporting:

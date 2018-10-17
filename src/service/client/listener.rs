@@ -1,7 +1,7 @@
 use crate::state::{ClientPool, RealmBrowser};
-use crate::Result;
+use crate::{util::CloseSignalFut, Result};
 use failure::{Context, Fail, ResultExt};
-use futures::{sync::oneshot, Future, Stream};
+use futures::{Future, Stream};
 use muonline_packet::XOR_CIPHER;
 use muonline_packet_codec::{self, PacketCodec};
 use std::net::{Shutdown, SocketAddr, SocketAddrV4};
@@ -13,13 +13,10 @@ pub fn serve(
   socket: SocketAddrV4,
   realms: RealmBrowser,
   clients: ClientPool,
-  close_rx: oneshot::Receiver<()>,
+  close_rx: CloseSignalFut,
 ) -> Result<()> {
-  let close_signal = close_rx.map_err(|error| {
-    error
-      .context("Controller channel closed prematurely")
-      .into()
-  });
+  let close_signal =
+    close_rx.map_err(|_| Context::new("Controller channel closed prematurely").into());
 
   // Listen on the supplied TCP socket
   let listener =

@@ -1,6 +1,5 @@
 use crate::state::{ClientPool, RealmBrowser};
 use crate::{ClientService, ConnectServer, EventObserver, Result, RpcService};
-use failure::ResultExt;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 
@@ -30,10 +29,8 @@ impl ServerBuilder {
     realms.add_listener(&observer)?;
     clients.add_listener(&observer)?;
 
-    let client_service = ClientService::spawn(self.socket, realms.clone(), clients)
-      .context("Failed to spawn client service")?;
-    let rpc_service = RpcService::spawn(self.rpc_host, self.rpc_port, realms)
-      .context("Failed to spawn RPC service")?;
+    let client_service = ClientService::spawn(self.socket, realms.clone(), clients);
+    let rpc_service = RpcService::spawn(self.rpc_host, self.rpc_port, realms);
 
     Ok(ConnectServer {
       observer,

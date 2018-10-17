@@ -1,5 +1,6 @@
 use super::proto;
 use crate::state::{RealmBrowser, RealmServer};
+use crate::util::CloseSignalFut;
 use futures::{Future, Stream};
 use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatusCode};
 use tap::TapResultOps;
@@ -12,39 +13,24 @@ macro_rules! rpcerr {
 }
 
 #[derive(Clone)]
-pub struct RpcListener<T>
-where
-  T: Stream<Item = (), Error = ()> + Send + Clone + 'static,
-{
-  close_rx: T,
+pub struct RpcListener {
+  close_rx: CloseSignalFut,
   realms: RealmBrowser,
 }
 
-impl<T> RpcListener<T>
-where
-  T: Stream<Item = (), Error = ()> + Send + Clone + 'static,
-{
-  pub fn new(realms: RealmBrowser, close_rx: T) -> Self {
+impl RpcListener {
+  pub fn new(realms: RealmBrowser, close_rx: CloseSignalFut) -> Self {
     RpcListener { realms, close_rx }
   }
 }
 
-impl<T> proto::RealmService for RpcListener<T>
-where
-  T: Stream<Item = (), Error = ()> + Send + Clone + 'static,
-{
+impl proto::RealmService for RpcListener {
   fn register_realm(
     &self,
     ctx: RpcContext,
     stream: RequestStream<proto::RealmParams>,
     sink: ClientStreamingSink<proto::RealmResult>,
   ) {
-    let close_signal = self
-      .close_rx
-      .clone()
-      .into_future()
-      .then(|_| Err(rpcerr!(Unavailable, "Shutting down")));
-
     let realm_stream = stream
       // Apply context for any potential errors
       .map_err(|error| rpcerr!(Aborted, format!("Stream closed: {}", error)))
@@ -93,6 +79,11 @@ where
           result
         })
       }).then(|result| result.tap_err(|error| println!("TODO: LOG {:?}", error)));
+
+    let close_signal = self
+      .close_rx
+      .clone()
+      .then(|_| Err(rpcerr!(Unavailable, "Shutting down")));
 
     let send_response = process_realm_updates
       // Check for a potential close signal

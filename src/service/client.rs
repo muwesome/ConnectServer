@@ -10,9 +10,9 @@ pub struct ClientService(ThreadController);
 
 impl ClientService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(socket: SocketAddrV4, realms: RealmBrowser, clients: ClientPool) -> Result<Self> {
+  pub fn spawn(socket: SocketAddrV4, realms: RealmBrowser, clients: ClientPool) -> Self {
     let ctl = ThreadController::spawn(move |rx| listener::serve(socket, realms, clients, rx));
-    Ok(ClientService(ctl))
+    ClientService(ctl)
   }
 
   /// Returns whether the service is still active or not.

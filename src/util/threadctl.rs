@@ -1,13 +1,32 @@
 use crate::Result;
 use failure::Context;
-use futures::sync::oneshot;
-use std::sync::{Arc, atomic::{Ordering, AtomicBool}};
+use futures::{future::Shared, sync::oneshot, Async, Future, Poll};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use tap::TapOps;
 
+#[derive(Clone)]
+pub struct CloseSignalFut {
+  receiver: Shared<oneshot::Receiver<()>>,
+}
+
+impl Future for CloseSignalFut {
+  type Item = ();
+  type Error = ();
+
+  fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    match self.receiver.poll() {
+      Ok(Async::Ready(_)) => Ok(Async::Ready(())),
+      Ok(Async::NotReady) => Ok(Async::NotReady),
+      Err(_) => Err(()),
+    }
+  }
+}
+
 struct ThreadControllerInner {
   is_alive: Arc<AtomicBool>,
-  close_tx: oneshot::Sender<()>,
+  sender: oneshot::Sender<()>,
   thread: JoinHandle<Result<()>>,
 }
 
@@ -18,16 +37,20 @@ impl ThreadController {
   /// Spawns a thread and returns its controller.
   pub fn spawn<F>(closure: F) -> Self
   where
-    F: FnOnce(oneshot::Receiver<()>) -> Result<()> + Send + 'static,
+    F: FnOnce(CloseSignalFut) -> Result<()> + Send + 'static,
   {
-    // TODO: Use cloneable broadcast signal here?
-    let (close_tx, close_rx) = oneshot::channel();
+    let (sender, receiver) = oneshot::channel();
     let is_alive = Arc::new(AtomicBool::new(true));
     let thread = thread::spawn(closet!([is_alive] move || {
+      let close_rx = CloseSignalFut { receiver: receiver.shared() };
       closure(close_rx).tap(|_| is_alive.store(false, Ordering::SeqCst))
     }));
 
-    ThreadController(Some(ThreadControllerInner { is_alive, close_tx, thread }))
+    ThreadController(Some(ThreadControllerInner {
+      is_alive,
+      sender,
+      thread,
+    }))
   }
 
   /// Returns whether the thread is still alive or not.
@@ -54,7 +77,7 @@ impl ThreadController {
   fn stop_and_join_thread(&mut self) -> Result<()> {
     if let Some(inner) = self.0.take() {
       inner
-        .close_tx
+        .sender
         .send(())
         .map_err(|_| Context::new("Thread receiver closed prematurely"))?;
       Self::join_thread(inner.thread)?;
