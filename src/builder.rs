@@ -1,4 +1,4 @@
-use crate::state::{ClientManager, RealmBrowser};
+use crate::state::{ClientPool, RealmBrowser};
 use crate::{ClientService, ConnectServer, EventObserver, Result, RpcService};
 use failure::ResultExt;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -24,7 +24,7 @@ impl ServerBuilder {
 
   pub fn spawn(self) -> Result<ConnectServer> {
     let realms = RealmBrowser::new();
-    let clients = ClientManager::new();
+    let clients = ClientPool::new();
 
     let observer = Arc::new(Mutex::new(EventObserver));
     realms.add_listener(&observer)?;

@@ -1,4 +1,4 @@
-use crate::state::{ClientManager, RealmBrowser};
+use crate::state::{ClientPool, RealmBrowser};
 use crate::Result;
 use failure::{Context, Fail, ResultExt};
 use futures::{sync::oneshot, Future, Stream};
@@ -12,7 +12,7 @@ use tokio::{self, codec::Decoder};
 pub fn serve(
   socket: SocketAddrV4,
   realms: RealmBrowser,
-  clients: ClientManager,
+  clients: ClientPool,
   close_rx: oneshot::Receiver<()>,
 ) -> Result<()> {
   let close_signal = close_rx.map_err(|error| {
@@ -35,7 +35,7 @@ pub fn serve(
     .map_err(|error| error.context("Client stream error").into())
     // Process each new client connection
     .for_each(closet!([realms, clients] move |stream| {
-      process_client(&realms, &clients, stream)
+      serve_client(&realms, &clients, stream)
     }))
     // Listen for any cancellation events from the controller
     .select(close_signal);
@@ -50,7 +50,7 @@ pub fn serve(
 }
 
 /// Setups and spawns a new task for a client.
-fn process_client(realms: &RealmBrowser, clients: &ClientManager, stream: TcpStream) -> Result<()> {
+fn serve_client(realms: &RealmBrowser, clients: &ClientPool, stream: TcpStream) -> Result<()> {
   // Try to add the client to the manager
   let id = match clients.add(ipv4socket(&stream)?) {
     Ok(id) => id,

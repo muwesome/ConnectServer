@@ -1,4 +1,4 @@
-pub use self::client::{Client, ClientEvent, ClientId, ClientManager};
+pub use self::client::{Client, ClientEvent, ClientId, ClientPool};
 pub use self::realm::{RealmBrowser, RealmEvent, RealmServer, RealmServerId};
 
 mod client;

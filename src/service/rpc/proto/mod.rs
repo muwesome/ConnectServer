@@ -14,6 +14,7 @@ impl TryFrom<RealmDefinition> for state::RealmServer {
   fn try_from(definition: RealmDefinition) -> Result<Self> {
     let status = definition.get_status();
 
+    // TODO: Validate more? (e.g clients <= capacity, host == ip/domain)
     Ok(state::RealmServer {
       id: state::RealmServerId::try_from(definition.get_id()).context("Invalid id specified")?,
       host: definition.get_host().into(),

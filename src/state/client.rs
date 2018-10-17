@@ -48,27 +48,27 @@ type ClientReader = ReadHandle<ClientId, Client, (), RandomState>;
 /// Client server collection writer.
 type ClientWriter = WriteHandle<ClientId, Client, (), RandomState>;
 
-struct ClientManagerInner {
+struct ClientPoolInner {
   dispatcher: Dispatcher<ClientEvent>,
   writer: ClientWriter,
   pool: IndexPool,
 }
 
 #[derive(Clone)]
-pub struct ClientManager {
-  inner: Arc<Mutex<ClientManagerInner>>,
+pub struct ClientPool {
+  inner: Arc<Mutex<ClientPoolInner>>,
   reader: ClientReader,
 }
 
-impl ClientManager {
+impl ClientPool {
   pub fn new() -> Self {
     let (reader, writer) = evmap::new();
-    let inner = Arc::new(Mutex::new(ClientManagerInner {
+    let inner = Arc::new(Mutex::new(ClientPoolInner {
       pool: IndexPool::new(),
       dispatcher: Dispatcher::new(),
       writer,
     }));
-    ClientManager { reader, inner }
+    ClientPool { reader, inner }
   }
 
   pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
@@ -111,7 +111,7 @@ impl ClientManager {
     Ok(())
   }
 
-  fn inner(&self) -> Result<MutexGuard<ClientManagerInner>> {
+  fn inner(&self) -> Result<MutexGuard<ClientPoolInner>> {
     Ok(
       self
         .inner

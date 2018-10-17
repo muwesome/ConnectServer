@@ -1,4 +1,4 @@
-use crate::state::{ClientManager, RealmBrowser};
+use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::ThreadController, Result};
 use std::net::SocketAddrV4;
 
@@ -10,7 +10,7 @@ pub struct ClientService(ThreadController);
 
 impl ClientService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(socket: SocketAddrV4, realms: RealmBrowser, clients: ClientManager) -> Result<Self> {
+  pub fn spawn(socket: SocketAddrV4, realms: RealmBrowser, clients: ClientPool) -> Result<Self> {
     let ctl = ThreadController::spawn(move |rx| listener::serve(socket, realms, clients, rx));
     Ok(ClientService(ctl))
   }
