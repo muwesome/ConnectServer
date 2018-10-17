@@ -17,6 +17,11 @@ impl ClientService {
     Ok(ClientService(ThreadController::new(tx, handle)))
   }
 
+  /// Returns whether the service is still active or not.
+  pub fn is_active(&self) -> bool {
+    self.0.is_alive()
+  }
+
   /// Stops the service.
   pub fn stop(self) -> Result<()> {
     self.0.stop()

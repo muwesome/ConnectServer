@@ -1,5 +1,8 @@
-use std::net::{Ipv4Addr, SocketAddrV4};
 use mucs::ConnectServer;
+use std::net::{Ipv4Addr, SocketAddrV4};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::{thread, time::Duration};
 use structopt::StructOpt;
 
 #[derive(Clone, Debug, StructOpt)]
@@ -47,6 +50,17 @@ fn main() {
     .spawn()
     .expect("Failed to spawn");
 
-  server.wait().expect("Failed to wait");
-  println!("WE ENDZ NOWZ BOYZ ;)");
+  let running = Arc::new(AtomicBool::new(true));
+  let runningc = running.clone();
+
+  ctrlc::set_handler(move || {
+    println!("Shutting down server...");
+    runningc.store(false, Ordering::SeqCst);
+  }).expect("Error setting Ctrl-C handler");
+
+  while server.is_active() && running.load(Ordering::SeqCst) {
+    thread::sleep(Duration::from_millis(100));
+  }
+
+  server.stop().expect("Failed to stop server");
 }

@@ -10,6 +10,13 @@ impl ThreadController {
     ThreadController(Some((close_tx, thread)))
   }
 
+  pub fn is_alive(&self) -> bool {
+    self
+      .0
+      .as_ref()
+      .map_or(false, |(ref tx, _)| !tx.is_canceled())
+  }
+
   pub fn wait(mut self) -> Result<()> {
     if let Some((_, thread)) = self.0.take() {
       Self::join_thread(thread)?;
@@ -18,10 +25,10 @@ impl ThreadController {
   }
 
   pub fn stop(mut self) -> Result<()> {
-    self.stop_impl()
+    self.stop_and_join_thread()
   }
 
-  fn stop_impl(&mut self) -> Result<()> {
+  fn stop_and_join_thread(&mut self) -> Result<()> {
     if let Some((close_tx, thread)) = self.0.take() {
       close_tx
         .send(())
@@ -42,6 +49,6 @@ impl ThreadController {
 
 impl Drop for ThreadController {
   fn drop(&mut self) {
-    self.stop_impl().expect("TODO:");
+    self.stop_and_join_thread().expect("TODO:");
   }
 }

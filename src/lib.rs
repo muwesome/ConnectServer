@@ -48,6 +48,11 @@ impl ConnectServer {
     ServerBuilder::default()
   }
 
+  /// Returns whether the server is still active or not.
+  pub fn is_active(&self) -> bool {
+    self.client_service.is_active()
+  }
+
   /// Stops the server.
   pub fn stop(self) -> Result<()> {
     let result = self.client_service.stop();

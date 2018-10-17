@@ -1,8 +1,8 @@
 use crate::state::{ClientManager, RealmBrowser};
 use crate::{ClientService, ConnectServer, EventObserver, Result, RpcService};
 use failure::ResultExt;
-use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddrV4};
+use std::sync::{Arc, Mutex};
 
 pub struct ServerBuilder {
   socket: SocketAddrV4,
