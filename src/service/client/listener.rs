@@ -22,9 +22,10 @@ pub fn serve(
   });
 
   // Listen on the supplied TCP socket
-  let listener = TcpListener::bind(&socket.into())
-    .context("Failed to bind connect service socket")?;
-  let local_addr = listener.local_addr()
+  let listener =
+    TcpListener::bind(&socket.into()).context("Failed to bind connect service socket")?;
+  let local_addr = listener
+    .local_addr()
     .context("Failed to determine connect service socket")?;
 
   let server = listener

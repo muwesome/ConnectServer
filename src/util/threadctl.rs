@@ -1,25 +1,35 @@
 use crate::Result;
 use failure::Context;
 use futures::sync::oneshot;
-use std::thread;
+use std::thread::{self, JoinHandle};
 
-pub struct ThreadController(Option<(oneshot::Sender<()>, thread::JoinHandle<Result<()>>)>);
+struct ThreadControllerInner {
+  close_tx: oneshot::Sender<()>,
+  thread: JoinHandle<Result<()>>,
+}
+
+pub struct ThreadController(Option<ThreadControllerInner>);
 
 impl ThreadController {
-  pub fn new(close_tx: oneshot::Sender<()>, thread: thread::JoinHandle<Result<()>>) -> Self {
-    ThreadController(Some((close_tx, thread)))
+  pub fn spawn<F>(closure: F) -> Self
+  where
+    F: FnOnce(oneshot::Receiver<()>) -> Result<()> + Send + 'static,
+  {
+    let (close_tx, close_rx) = oneshot::channel();
+    let thread = thread::spawn(move || closure(close_rx));
+    ThreadController(Some(ThreadControllerInner { close_tx, thread }))
   }
 
   pub fn is_alive(&self) -> bool {
     self
       .0
       .as_ref()
-      .map_or(false, |(ref tx, _)| !tx.is_canceled())
+      .map_or(false, |inner| !inner.close_tx.is_canceled())
   }
 
   pub fn wait(mut self) -> Result<()> {
-    if let Some((_, thread)) = self.0.take() {
-      Self::join_thread(thread)?;
+    if let Some(inner) = self.0.take() {
+      Self::join_thread(inner.thread)?;
     }
     Ok(())
   }
@@ -29,16 +39,17 @@ impl ThreadController {
   }
 
   fn stop_and_join_thread(&mut self) -> Result<()> {
-    if let Some((close_tx, thread)) = self.0.take() {
-      close_tx
+    if let Some(inner) = self.0.take() {
+      inner
+        .close_tx
         .send(())
         .map_err(|_| Context::new("Thread receiver closed prematurely"))?;
-      Self::join_thread(thread)?;
+      Self::join_thread(inner.thread)?;
     }
     Ok(())
   }
 
-  fn join_thread(thread: thread::JoinHandle<Result<()>>) -> Result<()> {
+  fn join_thread(thread: JoinHandle<Result<()>>) -> Result<()> {
     thread
       .join()
       // TODO: Log the 'Debug' result
