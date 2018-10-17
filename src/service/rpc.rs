@@ -13,19 +13,20 @@ impl RpcService {
   pub fn spawn<S: Into<String>>(host: S, port: u16, realms: RealmBrowser) -> Result<Self> {
     let service = proto::create_connect_service(listener::RpcListener::new(realms));
 
-    let host = host.into();
     let environment = Arc::new(Environment::new(1));
 
     let mut server = ServerBuilder::new(environment)
       .register_service(service)
-      .bind(host.clone(), port)
+      .bind(host, port)
       .build()
       .context("Failed to build service")?;
 
     let (tx, rx) = oneshot::channel();
     let handle = thread::spawn(move || {
       server.start();
-      println!("RPC listening on {}:{}", &host, port);
+      for &(ref host, port) in server.bind_addrs() {
+        println!("RPC listening on {}:{}", host, port);
+      }
 
       rx.wait().context("Thread transmitter closed prematurely")?;
       server

@@ -22,7 +22,12 @@ pub fn serve(
   });
 
   // Listen on the supplied TCP socket
-  let server = TcpListener::bind(&socket.into())?
+  let listener = TcpListener::bind(&socket.into())
+    .context("Failed to bind connect service socket")?;
+  let local_addr = listener.local_addr()
+    .context("Failed to determine connect service socket")?;
+
+  let server = listener
     // Wait for incoming connections
     .incoming()
     // Apply context for any errors
@@ -34,7 +39,7 @@ pub fn serve(
     // Listen for any cancellation events from the controller
     .select(close_signal);
 
-  println!("Client listening on {}", socket);
+  println!("Client listening on {}", local_addr);
   tokio::run(
     server
       .map(|(item, _)| item)

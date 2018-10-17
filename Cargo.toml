@@ -9,19 +9,27 @@ edition = "2018"
 doc = false
 name = "mu-cs"
 path = "src/bin/main.rs"
+required-features = ["build-binary"]
 
 [dependencies]
-grpcio = { version = "0.4.0", default-features = false, features = ["protobuf-codec"] }
+grpcio = { version = "0.4", default-features = false, features = ["protobuf-codec"] }
 muonline-packet = { path = "../Packet/muonline-packet" }
 muonline-packet_codec = { path = "../Packet/muonline-packet_codec" }
 muonline-protocol = { path = "../Protocol" }
-evmap = "4.0.0"
-futures = "0.1.25"
-protobuf = "2.0"
-failure = "0.1.2"
-try_from = "0.2.2"
-tokio = "0.1.11"
-index-pool = "1.0.11"
+evmap = "4.0"
+futures = "0.1"
+protobuf = "2"
+failure = "0.1"
+try_from = "0.2"
+tokio = "0.1"
+index-pool = "1.0"
+
+[dependencies.structopt]
+version = "0.2"
+optional = true
+
+[features]
+build-binary = ["structopt"]
 
 [build-dependencies]
 protoc-grpcio = "0.2"
