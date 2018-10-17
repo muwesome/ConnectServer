@@ -1,9 +1,12 @@
 use crate::Result;
 use failure::Context;
 use futures::sync::oneshot;
+use std::sync::{Arc, atomic::{Ordering, AtomicBool}};
 use std::thread::{self, JoinHandle};
+use tap::TapOps;
 
 struct ThreadControllerInner {
+  is_alive: Arc<AtomicBool>,
   close_tx: oneshot::Sender<()>,
   thread: JoinHandle<Result<()>>,
 }
@@ -17,10 +20,14 @@ impl ThreadController {
   where
     F: FnOnce(oneshot::Receiver<()>) -> Result<()> + Send + 'static,
   {
-    // TODO: Use cloneable close signal from here?
+    // TODO: Use cloneable broadcast signal here?
     let (close_tx, close_rx) = oneshot::channel();
-    let thread = thread::spawn(move || closure(close_rx));
-    ThreadController(Some(ThreadControllerInner { close_tx, thread }))
+    let is_alive = Arc::new(AtomicBool::new(true));
+    let thread = thread::spawn(closet!([is_alive] move || {
+      closure(close_rx).tap(|_| is_alive.store(false, Ordering::SeqCst))
+    }));
+
+    ThreadController(Some(ThreadControllerInner { is_alive, close_tx, thread }))
   }
 
   /// Returns whether the thread is still alive or not.
@@ -28,7 +35,7 @@ impl ThreadController {
     self
       .0
       .as_ref()
-      .map_or(false, |inner| !inner.close_tx.is_canceled())
+      .map_or(false, |inner| inner.is_alive.load(Ordering::SeqCst))
   }
 
   /// Waits for the thread to finish.
