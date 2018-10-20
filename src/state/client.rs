@@ -69,7 +69,11 @@ impl ClientPool {
       dispatcher: Dispatcher::new(),
       writer,
     }));
-    ClientPool { reader, inner, capacity }
+    ClientPool {
+      reader,
+      inner,
+      capacity,
+    }
   }
 
   pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
@@ -101,7 +105,6 @@ impl ClientPool {
     let mut inner = self.inner()?;
 
     inner.pool.return_id(id).context("Non existent client ID")?;
-
     self.reader.get_and(&id, |client| {
       let event = ClientEvent::Disconnect;
       inner.dispatcher.dispatch(&event, &client[0]);

@@ -42,6 +42,17 @@ pub struct ClientServiceConfig {
   #[cfg_attr(
     feature = "build-binary",
     structopt(
+      long = "max-unresponsive-time",
+      help = "Maximum unresponsive time until a client is dropped",
+      default_value = "60s",
+      parse(try_from_str = "humantime::parse_duration")
+    )
+  )]
+  pub max_unresponsive_time: Duration,
+
+  #[cfg_attr(
+    feature = "build-binary",
+    structopt(
       long = "max-packet-size",
       help = "Maximum packet size allowed from a client",
       default_value = "6"

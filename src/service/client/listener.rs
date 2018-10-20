@@ -2,13 +2,14 @@ use super::ClientServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::CloseSignal, Result};
 use failure::{Context, Fail, ResultExt};
-use futures::{Future, Stream};
+use futures::{Future, Sink, Stream};
 use muonline_packet::XOR_CIPHER;
 use muonline_packet_codec::{self, PacketCodec};
 use std::net::{SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::{self, codec::Decoder, prelude::StreamExt};
+use tokio::prelude::{FutureExt, StreamExt};
+use tokio::{self, codec::Decoder};
 
 /// Starts serving the Connect Server
 pub fn serve(
@@ -32,7 +33,7 @@ pub fn serve(
     // Wait for incoming connections
     .incoming()
     // Apply context for any errors
-    .map_err(|error| error.context("Client stream error").into())
+    .map_err(|error| error.context("Connect service stream error").into())
     // Process each new client connection
     .for_each(move |stream| serve_client(config.clone(), &realms, &clients, stream))
     // Listen for any cancellation events from the controller
@@ -75,8 +76,10 @@ fn serve_client(
         .unwrap_or_else(|| Context::new("Client timed out").into()))
     // Each packet received maps to a response packet
     .and_then(closet!([realms] move |packet| super::io::process(&realms, &packet)))
-    // Send each response packet to the client (TODO: Timeout?)
-    .forward(writer)
+    // Forward the packets to the client
+    .fold(writer, closet!([config] move |sink, packet| {
+      sink.send(packet).timeout(config.max_unresponsive_time)
+    }))
     // Remove the client from the service state
     .then(closet!([clients] move |future| future.and(clients.remove(id))));
 
