@@ -1,6 +1,6 @@
 use super::ClientServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
-use crate::{util::CloseSignalFut, Result};
+use crate::{util::CloseSignal, Result};
 use failure::{Context, Fail, ResultExt};
 use futures::{Future, Stream};
 use muonline_packet::XOR_CIPHER;
@@ -15,7 +15,7 @@ pub fn serve(
   config: ClientServiceConfig,
   realms: RealmBrowser,
   clients: ClientPool,
-  close_rx: CloseSignalFut,
+  close_rx: CloseSignal,
 ) -> Result<()> {
   let config = Arc::new(config);
   let close_signal =

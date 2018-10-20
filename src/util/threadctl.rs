@@ -7,11 +7,11 @@ use std::thread::{self, JoinHandle};
 use tap::TapOps;
 
 #[derive(Clone)]
-pub struct CloseSignalFut {
+pub struct CloseSignal {
   receiver: Shared<oneshot::Receiver<()>>,
 }
 
-impl Future for CloseSignalFut {
+impl Future for CloseSignal {
   type Item = ();
   type Error = ();
 
@@ -37,12 +37,12 @@ impl ThreadController {
   /// Spawns a thread and returns its controller.
   pub fn spawn<F>(closure: F) -> Self
   where
-    F: FnOnce(CloseSignalFut) -> Result<()> + Send + 'static,
+    F: FnOnce(CloseSignal) -> Result<()> + Send + 'static,
   {
     let (sender, receiver) = oneshot::channel();
     let is_alive = Arc::new(AtomicBool::new(true));
     let thread = thread::spawn(closet!([is_alive] move || {
-      let close_rx = CloseSignalFut { receiver: receiver.shared() };
+      let close_rx = CloseSignal { receiver: receiver.shared() };
       closure(close_rx).tap(|_| is_alive.store(false, Ordering::SeqCst))
     }));
 

@@ -1,5 +1,5 @@
 pub use self::config::RpcServiceConfig;
-use crate::util::{CloseSignalFut, ThreadController};
+use crate::util::{CloseSignal, ThreadController};
 use crate::{state::RealmBrowser, Result};
 use failure::{Context, Error, ResultExt};
 use futures::Future;
@@ -22,7 +22,7 @@ impl RpcService {
     self.0.stop()
   }
 
-  fn serve(config: RpcServiceConfig, realms: RealmBrowser, close_rx: CloseSignalFut) -> Result<()> {
+  fn serve(config: RpcServiceConfig, realms: RealmBrowser, close_rx: CloseSignal) -> Result<()> {
     let service = proto::create_realm_service(listener::RpcListener::new(realms, close_rx.clone()));
 
     let environment = Arc::new(Environment::new(1));

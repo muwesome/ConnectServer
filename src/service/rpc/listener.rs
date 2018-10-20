@@ -1,6 +1,6 @@
 use super::proto;
 use crate::state::{RealmBrowser, RealmServer};
-use crate::util::CloseSignalFut;
+use crate::util::CloseSignal;
 use futures::{Future, Stream};
 use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatusCode};
 use tap::TapResultOps;
@@ -15,12 +15,12 @@ macro_rules! rpcerr {
 
 #[derive(Clone)]
 pub struct RpcListener {
-  close_rx: CloseSignalFut,
+  close_rx: CloseSignal,
   realms: RealmBrowser,
 }
 
 impl RpcListener {
-  pub fn new(realms: RealmBrowser, close_rx: CloseSignalFut) -> Self {
+  pub fn new(realms: RealmBrowser, close_rx: CloseSignal) -> Self {
     RpcListener { realms, close_rx }
   }
 }
