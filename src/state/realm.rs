@@ -121,7 +121,6 @@ impl RealmBrowser {
   where
     F: FnOnce(&mut RealmServer),
   {
-    // TODO: Use 'chashmap' instead to avoid cloning?
     let mut inner = self.inner()?;
     let mut realm = inner
       .writer

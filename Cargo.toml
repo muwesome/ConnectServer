@@ -5,6 +5,9 @@ version = "0.1.0"
 build = "build.rs"
 edition = "2018"
 
+[profile.release]
+lto = "thin"
+
 [[bin]]
 doc = false
 name = "mu-cs"
@@ -26,6 +29,7 @@ index-pool = "1.0"
 tap = "0.3"
 ctrlc = { version = "3.1", optional = true }
 structopt = { version = "0.2", optional = true }
+humantime = "1.1.1"
 
 [features]
 build-binary = ["ctrlc", "structopt"]

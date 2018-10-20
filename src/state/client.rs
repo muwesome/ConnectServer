@@ -58,17 +58,18 @@ struct ClientPoolInner {
 pub struct ClientPool {
   inner: Arc<Mutex<ClientPoolInner>>,
   reader: ClientReader,
+  capacity: usize,
 }
 
 impl ClientPool {
-  pub fn new() -> Self {
+  pub fn new(capacity: usize) -> Self {
     let (reader, writer) = evmap::new();
     let inner = Arc::new(Mutex::new(ClientPoolInner {
       pool: IndexPool::new(),
       dispatcher: Dispatcher::new(),
       writer,
     }));
-    ClientPool { reader, inner }
+    ClientPool { reader, inner, capacity }
   }
 
   pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
@@ -81,8 +82,11 @@ impl ClientPool {
   }
 
   pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId> {
-    let mut inner = self.inner()?;
+    if self.reader.len() >= self.capacity {
+      Err(Context::new("Client pool is full"))?;
+    }
 
+    let mut inner = self.inner()?;
     let client_id = inner.pool.new_id();
     let client = Client::new(client_id, socket);
 

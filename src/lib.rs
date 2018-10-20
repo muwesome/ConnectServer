@@ -1,11 +1,13 @@
-pub use crate::builder::ServerBuilder;
 use crate::observer::EventObserver;
 use crate::service::{ClientService, RpcService};
+use crate::state::{ClientPool, RealmBrowser};
 use std::sync::{Arc, Mutex};
+
+#[cfg(feature = "build-binary")]
+use structopt::StructOpt;
 
 #[macro_use]
 mod util;
-mod builder;
 mod observer;
 mod service;
 mod state;
@@ -16,17 +18,26 @@ mod state;
 // TODO: Improve error reporting:
 // - Improved messages
 // - Customized types
-// - RPC status codes
 // TODO: Configurations
-// - DisconnectOnUnknownPacket
-// - Client timeout
-// - Max packet size
-// - Max connections (global)
-// - Max connections (per IP)
-// - Max server list/ip requests?
+// - ignore_unknown_packets
+// - max_connections_per_ip
+// - max_packet_size
+// - max_requests (specific per packet?)
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;
+
+#[cfg_attr(feature = "build-binary", derive(StructOpt))]
+#[cfg_attr(
+  feature = "build-binary",
+  structopt(about = "Mu Online Connect Server")
+)]
+pub struct ConnectConfig {
+  #[cfg_attr(feature = "build-binary", structopt(flatten))]
+  pub client: service::ClientServiceConfig,
+  #[cfg_attr(feature = "build-binary", structopt(flatten))]
+  pub rpc: service::RpcServiceConfig,
+}
 
 /// The server object.
 pub struct ConnectServer {
@@ -38,13 +49,23 @@ pub struct ConnectServer {
 
 impl ConnectServer {
   /// Spawns a new Connect Server using defaults.
-  pub fn spawn() -> Result<Self> {
-    Self::builder().spawn()
-  }
+  pub fn spawn(config: ConnectConfig) -> Result<Self> {
+    // TODO: Exposing awareness of 'max_connections' here?
+    let clients = ClientPool::new(config.client.max_connections);
+    let realms = RealmBrowser::new();
 
-  /// Returns a builder for the Connect Server.
-  pub fn builder() -> ServerBuilder {
-    ServerBuilder::default()
+    let observer = Arc::new(Mutex::new(EventObserver));
+    realms.add_listener(&observer)?;
+    clients.add_listener(&observer)?;
+
+    let client_service = ClientService::spawn(config.client, realms.clone(), clients);
+    let rpc_service = RpcService::spawn(config.rpc, realms);
+
+    Ok(ConnectServer {
+      observer,
+      rpc_service,
+      client_service,
+    })
   }
 
   /// Returns whether the server is still active or not.

@@ -6,6 +6,7 @@ use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatu
 use tap::TapResultOps;
 use try_from::TryFrom;
 
+/// Shorthand macro for creating an RPC error status.
 macro_rules! rpcerr {
   ($e:ident, $msg:expr) => {
     RpcStatus::new(RpcStatusCode::$e, Some($msg.into()))
@@ -35,7 +36,7 @@ impl proto::RealmService for RpcListener {
       // Apply context for any potential errors
       .map_err(|error| rpcerr!(Aborted, format!("Stream closed: {}", error)))
       // Require the realm field to be specified
-      .and_then(|realm| realm.kind.ok_or_else(|| {
+      .and_then(|input| input.kind.ok_or_else(|| {
         rpcerr!(InvalidArgument, "Kind not specified")
       }));
 
@@ -72,12 +73,11 @@ impl proto::RealmService for RpcListener {
             realm.clients = status.get_clients() as usize;
             realm.capacity = status.get_capacity() as usize;
           }).map_err(|error| rpcerr!(Internal, format!("Realm update failed: {}", error)))
-        })).then(move |result| {
-          // TODO: Introduce 'tap/inspect_any' here?
-          realms.remove(realm_id)
-            .map_err(|error| rpcerr!(Internal, format!("Realm removal failed: {}", error)))?;
-          result
-        })
+        })).then(move |result| result.and(
+          realms
+            .remove(realm_id)
+            .map_err(|error| rpcerr!(Internal, format!("Realm removal failed: {}", error)))
+        ))
       }).then(|result| result.tap_err(|error| println!("TODO: LOG {:?}", error)));
 
     let close_signal = self
