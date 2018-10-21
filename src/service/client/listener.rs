@@ -11,6 +11,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::{FutureExt, StreamExt};
 use tokio::{self, codec::Decoder};
 
+mod io;
+
 /// Starts serving the Connect Server
 pub fn serve(
   config: ClientServiceConfig,
@@ -74,8 +76,10 @@ fn serve_client(
         .into_inner()
         .map(|error| error.context("Client stream error").into())
         .unwrap_or_else(|| Context::new("Client timed out").into()))
-    // Each packet received maps to a response packet
-    .and_then(closet!([realms] move |packet| super::io::process(&realms, &packet)))
+    // Map each packet to a corresponding response
+    .and_then(closet!([config, realms] move |packet| io::process(&config, &realms, &packet)))
+    // Ignore any empty responses
+    .filter_map(|packet| packet)
     // Forward the packets to the client
     .fold(writer, closet!([config] move |sink, packet| {
       sink.send(packet).timeout(config.max_unresponsive_time)

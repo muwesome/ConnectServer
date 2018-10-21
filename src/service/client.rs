@@ -3,7 +3,6 @@ use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::ThreadController, Result};
 
 mod config;
-mod io;
 mod listener;
 
 /// Wraps the underlying connect server thread.

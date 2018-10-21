@@ -19,7 +19,6 @@ mod state;
 // - Improved messages
 // - Customized types
 // TODO: Configurations
-// - ignore_unknown_packets
 // - max_connections_per_ip
 // - max_packet_size
 // - max_requests (specific per packet?)

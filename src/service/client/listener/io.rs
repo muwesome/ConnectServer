@@ -1,11 +1,16 @@
+use super::ClientServiceConfig;
 use crate::{state::RealmBrowser, Result};
 use failure::{Context, ResultExt};
 use muonline_packet::{Packet, PacketEncodable};
 use muonline_protocol::connect::{self, server, Client};
 
-pub fn process(realms: &RealmBrowser, packet: &Packet) -> Result<Packet> {
+pub fn process(
+  config: &ClientServiceConfig,
+  realms: &RealmBrowser,
+  packet: &Packet,
+) -> Result<Option<Packet>> {
   // TODO: Simplify error handling & conversion
-  // TODO: Require 'ConnectServerRequest' before other packets
+  // TODO: Require 'ConnectServerRequest' before other packets?
   match Client::from_packet(&packet)? {
     Client::ConnectServerRequest(request) => {
       if request.version == connect::VERSION {
@@ -13,6 +18,7 @@ pub fn process(realms: &RealmBrowser, packet: &Packet) -> Result<Packet> {
           .to_packet()
           .context("Failed to construct server result packet")
           .map_err(From::from)
+          .map(Some)
       } else {
         Err(Context::new("Incorrect API version").into())
       }
@@ -23,6 +29,7 @@ pub fn process(realms: &RealmBrowser, packet: &Packet) -> Result<Packet> {
           .to_packet()
           .context("Failed to construct realm connect packet")
           .map_err(From::from)
+          .map(Some)
       }).and_then(|result| result),
     Client::RealmServerListRequest => {
       let mut list = Vec::with_capacity(realms.len());
@@ -33,7 +40,14 @@ pub fn process(realms: &RealmBrowser, packet: &Packet) -> Result<Packet> {
         .to_packet()
         .context("Failed to construct realm list packet")
         .map_err(From::from)
+        .map(Some)
     }
-    _ => Err(Context::new("Unknown packet type").into()),
+    _ => {
+      if config.ignore_unknown_packets {
+        Ok(None)
+      } else {
+        Err(Context::new("Unknown packet type").into())
+      }
+    }
   }
 }
