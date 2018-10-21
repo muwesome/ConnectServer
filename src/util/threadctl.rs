@@ -94,6 +94,8 @@ impl ThreadController {
 
 impl Drop for ThreadController {
   fn drop(&mut self) {
-    self.stop_and_join_thread().expect("TODO:");
+    if let Err(error) = self.stop_and_join_thread() {
+      println!("Thread error during destructor: {}", error);
+    }
   }
 }

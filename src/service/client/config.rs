@@ -63,6 +63,16 @@ pub struct ClientServiceConfig {
   #[cfg_attr(
     feature = "build-binary",
     structopt(
+      long = "max-requests",
+      help = "Maximum requests allowed from a client",
+      default_value = "20"
+    )
+  )]
+  pub max_requests: usize,
+
+  #[cfg_attr(
+    feature = "build-binary",
+    structopt(
       long = "max-connections",
       help = "Maximum connections the server should handle",
       default_value = "1000"

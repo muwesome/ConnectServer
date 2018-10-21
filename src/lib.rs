@@ -14,7 +14,7 @@ mod service;
 mod state;
 
 // TODO: Fix local packet dependencies
-// TODO: Quit if any service fails
+// TODO: Quit if the RPC service fails
 // TODO: Use structured logging
 // TODO: Add tons of logging
 // TODO: Improve error reporting:
@@ -23,7 +23,6 @@ mod state;
 // TODO: Configurations
 // - max_connections_per_ip
 // - max_packet_size
-// - max_requests (specific per packet?)
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;

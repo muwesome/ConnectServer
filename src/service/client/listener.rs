@@ -59,6 +59,7 @@ fn serve_client(
 ) -> Result<()> {
   // Try to add the client to the manager
   let id = clients.add(ipv4socket(&stream)?)?;
+  let mut requests = 0;
 
   let (writer, reader) = codec()
     // Use a non C3/C4 encrypted TCP codec
@@ -77,7 +78,14 @@ fn serve_client(
         .map(|error| error.context("Client stream error").into())
         .unwrap_or_else(|| Context::new("Client timed out").into()))
     // Map each packet to a corresponding response
-    .and_then(closet!([config, realms] move |packet| io::process(&config, &realms, &packet)))
+    .and_then(closet!([config, realms] move |packet| {
+      requests += 1;
+      if requests >= config.max_requests {
+        return Err(Context::new("Client exceeded maximum request count"))?;
+      }
+
+      io::process(&config, &realms, &packet)
+    }))
     // Ignore any empty responses
     .filter_map(|packet| packet)
     // Forward the packets to the client

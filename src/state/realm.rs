@@ -127,8 +127,8 @@ impl RealmBrowser {
       .get_and(&id, |realm| realm[0].clone())
       .ok_or_else(|| Context::new("Non existent realm ID"))?;
 
-    inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
     mutator(&mut realm);
+    inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
 
     inner.writer.update(id, realm);
     inner.writer.refresh();
