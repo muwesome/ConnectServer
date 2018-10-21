@@ -3,8 +3,9 @@ use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::{Context, ResultExt};
 use index_pool::IndexPool;
+use parking_lot::Mutex;
 use std::collections::hash_map::RandomState;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 use std::{fmt, net::SocketAddrV4};
 
 pub type ClientId = usize;
@@ -76,13 +77,12 @@ impl ClientPool {
     }
   }
 
-  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
+  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>)
   where
     L: Listener<ClientEvent> + Send + Sync + 'static,
   {
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     inner.dispatcher.add_listener(listener);
-    Ok(())
   }
 
   pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId> {
@@ -90,7 +90,7 @@ impl ClientPool {
       Err(Context::new("Client pool is full"))?;
     }
 
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     let client_id = inner.pool.new_id();
     let client = Client::new(client_id, socket);
 
@@ -102,7 +102,7 @@ impl ClientPool {
   }
 
   pub fn remove(&self, id: ClientId) -> Result<()> {
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
 
     inner.pool.return_id(id).context("Non existent client ID")?;
     self.reader.get_and(&id, |client| {
@@ -113,14 +113,5 @@ impl ClientPool {
     inner.writer.empty(id);
     inner.writer.refresh();
     Ok(())
-  }
-
-  fn inner(&self) -> Result<MutexGuard<ClientPoolInner>> {
-    Ok(
-      self
-        .inner
-        .lock()
-        .map_err(|_| Context::new("Client manager inner deadlock"))?,
-    )
   }
 }

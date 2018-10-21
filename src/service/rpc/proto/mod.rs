@@ -1,5 +1,5 @@
 use crate::{state, Result};
-use failure::{Error, ResultExt};
+use failure::{Error, ResultExt, Context};
 use try_from::TryFrom;
 
 pub use self::connectserver::*;
@@ -13,14 +13,18 @@ impl TryFrom<RealmParams_RealmDefinition> for state::RealmServer {
 
   fn try_from(definition: RealmParams_RealmDefinition) -> Result<Self> {
     let status = definition.get_status();
-
-    // TODO: Validate more? (e.g clients <= capacity, host == ip/domain)
-    Ok(state::RealmServer {
+    let server = state::RealmServer {
       id: state::RealmServerId::try_from(definition.get_id()).context("Invalid id specified")?,
       host: definition.get_host().into(),
       port: u16::try_from(definition.get_port()).context("Invalid port specified")?,
       clients: status.get_clients() as usize,
       capacity: status.get_capacity() as usize,
-    })
+    };
+
+    if server.clients > server.capacity {
+      Err(Context::new("Invalid capacity specified"))?;
+    }
+
+    Ok(server)
   }
 }

@@ -20,11 +20,12 @@ evmap = "4.0"
 failure = "0.1"
 futures = "0.1"
 grpcio = { version = "0.4", default-features = false, features = ["protobuf-codec"] }
-humantime = "1.1.1"
+humantime = "1.1"
 index-pool = "1.0"
 muonline-packet = { path = "../Packet/muonline-packet" }
 muonline-packet_codec = { path = "../Packet/muonline-packet_codec" }
 muonline-protocol = { path = "../Protocol" }
+parking_lot = "0.6"
 protobuf = "2"
 structopt = { version = "0.2", optional = true }
 tap = "0.3"

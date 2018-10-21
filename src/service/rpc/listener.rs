@@ -59,7 +59,6 @@ impl proto::RealmService for RpcListener {
       // Add the realm server to the browser
       .and_then(closet!([realms] move |(realm, stream)| {
         let realm_id = realm.id;
-        // TODO: Identify if error or duplicated realm ID
         realms.add(realm).map_err(|_| rpcerr!(InvalidArgument, "Non-unique realm ID"))?;
         Ok((realm_id, stream))
       }))
@@ -90,7 +89,6 @@ impl proto::RealmService for RpcListener {
       .select(close_signal)
       // Notify the client of the outcome
       .then(|result| match result {
-        // TODO: Use timeout?
         Ok(_) => sink.success(proto::RealmResult::new()),
         Err((error, _)) => sink.fail(error),
       });

@@ -1,7 +1,8 @@
 use crate::observer::EventObserver;
 use crate::service::{ClientService, RpcService};
 use crate::state::{ClientPool, RealmBrowser};
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[cfg(feature = "build-binary")]
 use structopt::StructOpt;
@@ -55,8 +56,8 @@ impl ConnectServer {
     let realms = RealmBrowser::new();
 
     let observer = Arc::new(Mutex::new(EventObserver));
-    realms.add_listener(&observer)?;
-    clients.add_listener(&observer)?;
+    realms.add_listener(&observer);
+    clients.add_listener(&observer);
 
     let client_service = ClientService::spawn(config.client, realms.clone(), clients);
     let rpc_service = RpcService::spawn(config.rpc, realms);

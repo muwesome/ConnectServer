@@ -2,7 +2,8 @@ use crate::util::{Dispatcher, Event, Listener};
 use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Context;
-use std::sync::{Arc, Mutex, MutexGuard};
+use parking_lot::Mutex;
+use std::sync::Arc;
 use std::{collections::hash_map::RandomState, fmt};
 
 /// A realm server identifier.
@@ -85,13 +86,12 @@ impl RealmBrowser {
     }
   }
 
-  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>) -> Result<()>
+  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>)
   where
     L: Listener<RealmEvent> + Send + Sync + 'static,
   {
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     inner.dispatcher.add_listener(listener);
-    Ok(())
   }
 
   pub fn add(&self, realm: RealmServer) -> Result<()> {
@@ -99,7 +99,7 @@ impl RealmBrowser {
       Err(Context::new("Duplicated realm IDs"))?;
     }
 
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     inner.dispatcher.dispatch(&RealmEvent::Register, &realm);
     inner.writer.insert(realm.id, realm);
     inner.writer.refresh();
@@ -107,7 +107,7 @@ impl RealmBrowser {
   }
 
   pub fn remove(&self, id: RealmServerId) -> Result<()> {
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     self.reader.get_and(&id, |client| {
       let event = RealmEvent::Deregister;
       inner.dispatcher.dispatch(&event, &client[0]);
@@ -121,7 +121,7 @@ impl RealmBrowser {
   where
     F: FnOnce(&mut RealmServer),
   {
-    let mut inner = self.inner()?;
+    let mut inner = self.inner.lock();
     let mut realm = inner
       .writer
       .get_and(&id, |realm| realm[0].clone())
@@ -148,14 +148,5 @@ impl RealmBrowser {
 
   pub fn len(&self) -> usize {
     self.reader.len()
-  }
-
-  fn inner(&self) -> Result<MutexGuard<RealmBrowserInner>> {
-    Ok(
-      self
-        .inner
-        .lock()
-        .map_err(|_| Context::new("Realm browser inner deadlock"))?,
-    )
   }
 }

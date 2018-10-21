@@ -87,7 +87,6 @@ impl ThreadController {
   fn join_thread(thread: JoinHandle<Result<()>>) -> Result<()> {
     thread
       .join()
-      // TODO: Save the 'Debug' result
       .map_err(|_| Context::new("Thread managed by controller panicked").into())
       .and_then(|result| result)
   }

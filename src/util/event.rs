@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex, Weak};
+use parking_lot::Mutex;
+use std::sync::{Arc, Weak};
 
 pub trait Event: Send + Sync {
   type Context;
@@ -34,7 +35,7 @@ impl<T: Event> Dispatcher<T> {
   pub fn dispatch(&mut self, event: &T, context: &T::Context) {
     self.listeners.retain(|listener| {
       if let Some(listener) = listener.upgrade() {
-        let mut listener = listener.lock().expect("TODO:");
+        let mut listener = listener.lock();
         listener.on_event(event, &context);
         true
       } else {
