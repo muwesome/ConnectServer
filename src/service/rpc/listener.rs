@@ -78,7 +78,7 @@ impl proto::RealmService for RpcListener {
             .remove(realm_id)
             .map_err(|error| rpcerr!(Internal, format!("Realm removal failed: {}", error)))
         ))
-      }).then(|result| result.tap_err(|error| println!("TODO: LOG {:?}", error)));
+      }).then(|result| result.tap_err(|error| println!("RPC client error: {:?}", error)));
 
     let close_signal = self
       .close_rx
@@ -97,7 +97,7 @@ impl proto::RealmService for RpcListener {
 
     let session = send_response.map_err(|error| {
       if !matches!(error, grpcio::Error::RemoteStopped) {
-        println!("TODO: LOG {:?}", error)
+        println!("RPC sink error: {}", error)
       }
     });
 

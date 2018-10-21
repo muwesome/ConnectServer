@@ -1,10 +1,8 @@
 use crate::Result;
 use failure::Context;
 use futures::{future::Shared, sync::oneshot, Async, Future, Poll};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use tap::TapOps;
 
 #[derive(Clone)]
 pub struct CloseSignal {
@@ -25,7 +23,7 @@ impl Future for CloseSignal {
 }
 
 struct ThreadControllerInner {
-  is_alive: Arc<AtomicBool>,
+  is_alive: Arc<()>,
   sender: oneshot::Sender<()>,
   thread: JoinHandle<Result<()>>,
 }
@@ -40,10 +38,11 @@ impl ThreadController {
     F: FnOnce(CloseSignal) -> Result<()> + Send + 'static,
   {
     let (sender, receiver) = oneshot::channel();
-    let is_alive = Arc::new(AtomicBool::new(true));
+    let is_alive = Arc::new(());
     let thread = thread::spawn(closet!([is_alive] move || {
+      let _keep_alive = is_alive;
       let close_rx = CloseSignal { receiver: receiver.shared() };
-      closure(close_rx).tap(|_| is_alive.store(false, Ordering::SeqCst))
+      closure(close_rx)
     }));
 
     ThreadController(Some(ThreadControllerInner {
@@ -58,7 +57,7 @@ impl ThreadController {
     self
       .0
       .as_ref()
-      .map_or(false, |inner| inner.is_alive.load(Ordering::SeqCst))
+      .map_or(false, |inner| Arc::strong_count(&inner.is_alive) > 1)
   }
 
   /// Waits for the thread to finish.
