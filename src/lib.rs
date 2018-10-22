@@ -1,6 +1,7 @@
 use crate::observer::EventObserver;
 use crate::service::{ConnectService, ConnectServiceConfig, RpcService};
 use crate::state::{ClientPool, RealmBrowser};
+use failure::ResultExt;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -14,13 +15,12 @@ mod service;
 mod state;
 
 // TODO: Fix local packet dependencies
-// TODO: Quit if the RPC service fails
-// TODO: Check error with invalid RPC host
 // TODO: Parse arguments from TOML as well
 // TODO: Use structured logging
+// TODO: Disable internal GRPC logger
 
 /// Default result type used.
-type Result<T> = ::std::result::Result<T, failure::Error>;
+type Result<T> = std::result::Result<T, failure::Error>;
 
 /// The server object.
 pub struct ConnectServer {
@@ -52,20 +52,33 @@ impl ConnectServer {
 
   /// Returns whether the server is still active or not.
   pub fn is_active(&self) -> bool {
-    self.connect_service.is_active()
+    // TODO: Disable connect service if RPC fails?
+    self.connect_service.is_active() && self.rpc_service.is_active()
   }
 
   /// Stops the server.
   pub fn stop(self) -> Result<()> {
-    let result = self.connect_service.stop();
-    self.rpc_service.stop()?;
-    result
+    let connect_result = self
+      .connect_service
+      .stop()
+      .context("Connect service failure (stop)");
+    let rpc_result = self
+      .rpc_service
+      .stop()
+      .context("RPC service failure (stop)");
+    connect_result.and(rpc_result).map_err(From::from)
   }
 
   /// Will block, waiting for the server to finish.
   pub fn wait(self) -> Result<()> {
-    let result = self.connect_service.wait();
-    self.rpc_service.stop()?;
-    result
+    let connect_result = self
+      .connect_service
+      .wait()
+      .context("Connect server failure (wait)");
+    let rpc_result = self
+      .rpc_service
+      .stop()
+      .context("RPC service failure (stop)");
+    connect_result.and(rpc_result).map_err(From::from)
   }
 }

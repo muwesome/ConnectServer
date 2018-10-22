@@ -5,7 +5,7 @@ use crate::{util::ThreadController, Result};
 mod config;
 mod listener;
 
-/// Wraps the underlying connect server thread.
+/// A connect service instance.
 pub struct ConnectService(ThreadController);
 
 impl ConnectService {

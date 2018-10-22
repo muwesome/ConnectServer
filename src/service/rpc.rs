@@ -1,7 +1,7 @@
 pub use self::config::RpcServiceConfig;
 use crate::util::{CloseSignal, ThreadController};
 use crate::{state::RealmBrowser, Result};
-use failure::{Context, Error, ResultExt};
+use failure::Fail;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
 use std::sync::Arc;
@@ -10,14 +10,34 @@ mod config;
 mod listener;
 mod proto;
 
+#[derive(Fail, Debug)]
+enum RpcServiceError {
+  #[fail(display = "Failed to build service: {}", _0)]
+  BuildFailure(#[cause] grpcio::Error),
+
+  #[fail(display = "Failed to shutdown service: {}", _0)]
+  ShutdownFailure(#[cause] grpcio::Error),
+
+  #[fail(display = "Close signal was aborted prematurely")]
+  CloseSignalAborted,
+}
+
+/// An RPC service instance.
 pub struct RpcService(ThreadController);
 
 impl RpcService {
+  /// Spawns a new RPC service instance.
   pub fn spawn(config: impl RpcServiceConfig, realms: RealmBrowser) -> Self {
     let ctl = ThreadController::spawn(move |rx| Self::serve(config, realms, rx));
     RpcService(ctl)
   }
 
+  /// Returns whether the service is still active or not.
+  pub fn is_active(&self) -> bool {
+    self.0.is_alive()
+  }
+
+  /// Stops the service.
   pub fn stop(self) -> Result<()> {
     self.0.stop()
   }
@@ -34,20 +54,20 @@ impl RpcService {
       .register_service(service)
       .bind(config.host(), config.port())
       .build()
-      .context("Failed to build service")?;
+      .map_err(RpcServiceError::BuildFailure)?;
 
     server.start();
     for &(ref host, port) in server.bind_addrs() {
       println!("RPC listening on {}:{}", host, port);
     }
 
-    close_rx
+    let close_result = close_rx
       .wait()
-      .map_err(|_| Error::from(Context::new("Thread transmitter closed prematurely")))?;
-    server
+      .map_err(|_| RpcServiceError::CloseSignalAborted);
+    let shutdown_result = server
       .shutdown()
       .wait()
-      .context("Error whilst shutting down service")
-      .map_err(From::from)
+      .map_err(RpcServiceError::ShutdownFailure);
+    shutdown_result.and(close_result).map_err(From::from)
   }
 }

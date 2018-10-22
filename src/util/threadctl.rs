@@ -75,11 +75,11 @@ impl ThreadController {
 
   fn stop_and_join_thread(&mut self) -> Result<()> {
     if let Some(inner) = self.0.take() {
-      inner
+      let close_result = inner
         .sender
         .send(())
-        .map_err(|_| Context::new("Thread receiver closed prematurely"))?;
-      Self::join_thread(inner.thread)?;
+        .map_err(|_| Context::new("Thread receiver closed prematurely").into());
+      Self::join_thread(inner.thread).and(close_result)?;
     }
     Ok(())
   }
