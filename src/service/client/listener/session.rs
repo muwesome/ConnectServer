@@ -4,7 +4,7 @@ use super::ClientServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use futures::{Future, Sink, Stream};
 use muonline_packet::{Packet, PacketEncodable, XOR_CIPHER};
-use muonline_packet_codec::{self, PacketCodec};
+use muonline_packet::{PacketCodec, PacketCodecState};
 use muonline_protocol::connect::{self, server, Client};
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -21,12 +21,12 @@ pub fn process(
   clients: &ClientPool,
   stream: TcpStream,
 ) -> crate::Result<()> {
-  // Try to add the client to the manager
+  // Try to add the client to the pool
   let id = clients
     .add(stream.peer_addr_v4()?)
     .map_err(ClientSessionError::ClientState)?;
 
-  let (writer, reader) = codec()
+  let (writer, reader) = codec(config.max_packet_size)
     // Use a non C3/C4 encrypted TCP codec
     .framed(stream)
     // Split the stream value into two separate handles
@@ -123,9 +123,10 @@ fn respond(
 }
 
 /// Returns the codec used for a Connect Server.
-fn codec() -> PacketCodec {
-  PacketCodec::new(
-    muonline_packet_codec::State::new(None, None),
-    muonline_packet_codec::State::new(Some(&XOR_CIPHER), None),
+fn codec(max_size: usize) -> PacketCodec {
+  PacketCodec::new_with_max_size(
+    PacketCodecState::new(),
+    PacketCodecState::builder().cipher(&XOR_CIPHER).build(),
+    max_size,
   )
 }

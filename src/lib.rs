@@ -16,11 +16,11 @@ mod state;
 // TODO: Fix local packet dependencies
 // TODO: Quit if the RPC service fails
 // TODO: Check error with invalid RPC host
+// TODO: Parse arguments from TOML as well
 // TODO: Use structured logging
 // TODO: Config separated or not?
 // TODO: Configurations
 // - max_connections_per_ip
-// - max_packet_size
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;
