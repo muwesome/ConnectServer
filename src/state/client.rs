@@ -4,8 +4,8 @@ use failure::Fail;
 use index_pool::IndexPool;
 use parking_lot::Mutex;
 use std::collections::hash_map::RandomState;
-use std::sync::Arc;
-use std::{fmt, net::SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddrV4};
+use std::{fmt, sync::Arc};
 
 pub type ClientId = usize;
 
@@ -49,6 +49,9 @@ pub enum ClientError {
 
   #[fail(display = "Max client capacity")]
   MaxCapacity,
+
+  #[fail(display = "Max client capacity for IP: {}", _0)]
+  MaxCapacityForIp(Ipv4Addr),
 }
 
 /// Realm server collection reader.
@@ -68,10 +71,11 @@ pub struct ClientPool {
   inner: Arc<Mutex<ClientPoolInner>>,
   reader: ClientReader,
   capacity: usize,
+  capacity_per_ip: usize,
 }
 
 impl ClientPool {
-  pub fn new(capacity: usize) -> Self {
+  pub fn new(capacity: usize, capacity_per_ip: usize) -> Self {
     let (reader, writer) = evmap::new();
     let inner = Arc::new(Mutex::new(ClientPoolInner {
       pool: IndexPool::new(),
@@ -82,6 +86,7 @@ impl ClientPool {
       reader,
       inner,
       capacity,
+      capacity_per_ip,
     }
   }
 
@@ -94,8 +99,13 @@ impl ClientPool {
   }
 
   pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId, ClientError> {
+    // TODO: Should these conditions be checked externally?
     if self.reader.len() >= self.capacity {
       Err(ClientError::MaxCapacity)?;
+    }
+
+    if self.num_of_clients_for_ip(*socket.ip()) > self.capacity_per_ip - 1 {
+      Err(ClientError::MaxCapacityForIp(*socket.ip()))?;
     }
 
     let mut inner = self.inner.lock();
@@ -126,5 +136,16 @@ impl ClientPool {
     inner.writer.empty(id);
     inner.writer.refresh();
     Ok(())
+  }
+
+  /// Returns the number of clients for an IP address.
+  fn num_of_clients_for_ip(&self, ip: Ipv4Addr) -> usize {
+    let mut ip_clients = 0;
+    self.reader.for_each(|_, client| {
+      if *client[0].socket.ip() == ip {
+        ip_clients += 1;
+      }
+    });
+    ip_clients
   }
 }

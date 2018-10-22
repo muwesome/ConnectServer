@@ -19,8 +19,6 @@ mod state;
 // TODO: Parse arguments from TOML as well
 // TODO: Use structured logging
 // TODO: Config separated or not?
-// TODO: Configurations
-// - max_connections_per_ip
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;
@@ -49,8 +47,11 @@ impl ConnectServer {
   /// Spawns a new Connect Server using defaults.
   pub fn spawn(config: ConnectConfig) -> Result<Self> {
     // TODO: Exposing awareness of 'max_connections' here?
-    let clients = ClientPool::new(config.client.max_connections);
     let realms = RealmBrowser::new();
+    let clients = ClientPool::new(
+      config.client.max_connections,
+      config.client.max_connections_per_ip,
+    );
 
     let observer = Arc::new(Mutex::new(EventObserver));
     realms.add_listener(&observer);
