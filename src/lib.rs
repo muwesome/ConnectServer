@@ -15,11 +15,9 @@ mod state;
 
 // TODO: Fix local packet dependencies
 // TODO: Quit if the RPC service fails
+// TODO: Check error with invalid RPC host
 // TODO: Use structured logging
-// TODO: Add tons of logging
-// TODO: Improve error reporting:
-// - Improved messages
-// - Customized types
+// TODO: Config separated or not?
 // TODO: Configurations
 // - max_connections_per_ip
 // - max_packet_size

@@ -1,5 +1,5 @@
 use crate::{state, Result};
-use failure::{Error, ResultExt, Context};
+use failure::{Context, Error, ResultExt};
 use try_from::TryFrom;
 
 pub use self::connectserver::*;

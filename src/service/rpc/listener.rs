@@ -50,7 +50,7 @@ impl proto::RealmService for RpcListener {
           .ok_or_else(|| rpcerr!(InvalidArgument, "Expected realm definition"))?;
 
         let realm = RealmServer::try_from(definition)
-          .map_err(|error| rpcerr!(InvalidArgument, format!("Invalid definition: {}", error)))?;
+          .map_err(|error| rpcerr!(InvalidArgument, format!("Realm insert failed: {}", error)))?;
         Ok((realm, stream))
       });
 

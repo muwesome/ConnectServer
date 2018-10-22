@@ -1,7 +1,6 @@
 use crate::util::{Dispatcher, Event, Listener};
-use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
-use failure::{Context, ResultExt};
+use failure::Fail;
 use index_pool::IndexPool;
 use parking_lot::Mutex;
 use std::collections::hash_map::RandomState;
@@ -41,6 +40,15 @@ pub enum ClientEvent {
 
 impl Event for ClientEvent {
   type Context = Client;
+}
+
+#[derive(Fail, Debug)]
+pub enum ClientError {
+  #[fail(display = "Inexistent client ID")]
+  InexistentId,
+
+  #[fail(display = "Max client capacity")]
+  MaxCapacity,
 }
 
 /// Realm server collection reader.
@@ -85,9 +93,9 @@ impl ClientPool {
     inner.dispatcher.add_listener(listener);
   }
 
-  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId> {
+  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId, ClientError> {
     if self.reader.len() >= self.capacity {
-      Err(Context::new("Client pool is full"))?;
+      Err(ClientError::MaxCapacity)?;
     }
 
     let mut inner = self.inner.lock();
@@ -101,14 +109,19 @@ impl ClientPool {
     Ok(client_id)
   }
 
-  pub fn remove(&self, id: ClientId) -> Result<()> {
+  pub fn remove(&self, id: ClientId) -> Result<(), ClientError> {
     let mut inner = self.inner.lock();
 
-    inner.pool.return_id(id).context("Non existent client ID")?;
-    self.reader.get_and(&id, |client| {
-      let event = ClientEvent::Disconnect;
-      inner.dispatcher.dispatch(&event, &client[0]);
-    });
+    inner
+      .pool
+      .return_id(id)
+      .map_err(|_| ClientError::InexistentId)?;
+    self
+      .reader
+      .get_and(&id, |client| {
+        let event = ClientEvent::Disconnect;
+        inner.dispatcher.dispatch(&event, &client[0]);
+      }).ok_or(ClientError::InexistentId)?;
 
     inner.writer.empty(id);
     inner.writer.refresh();

@@ -1,7 +1,6 @@
 use crate::util::{Dispatcher, Event, Listener};
-use crate::Result;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
-use failure::Context;
+use failure::Fail;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::{collections::hash_map::RandomState, fmt};
@@ -57,6 +56,15 @@ impl Event for RealmEvent {
   type Context = RealmServer;
 }
 
+#[derive(Fail, Debug)]
+pub enum RealmError {
+  #[fail(display = "Non-unique realm ID")]
+  DuplicateId,
+
+  #[fail(display = "Inexistent realm ID")]
+  InexistentId,
+}
+
 /// Realm server collection reader.
 type RealmReader = ReadHandle<RealmServerId, RealmServer, (), RandomState>;
 
@@ -94,9 +102,9 @@ impl RealmBrowser {
     inner.dispatcher.add_listener(listener);
   }
 
-  pub fn add(&self, realm: RealmServer) -> Result<()> {
+  pub fn add(&self, realm: RealmServer) -> Result<(), RealmError> {
     if self.reader.contains_key(&realm.id) {
-      Err(Context::new("Duplicated realm IDs"))?;
+      Err(RealmError::DuplicateId)?;
     }
 
     let mut inner = self.inner.lock();
@@ -106,18 +114,20 @@ impl RealmBrowser {
     Ok(())
   }
 
-  pub fn remove(&self, id: RealmServerId) -> Result<()> {
+  pub fn remove(&self, id: RealmServerId) -> Result<(), RealmError> {
     let mut inner = self.inner.lock();
-    self.reader.get_and(&id, |client| {
-      let event = RealmEvent::Deregister;
-      inner.dispatcher.dispatch(&event, &client[0]);
-    });
+    self
+      .reader
+      .get_and(&id, |client| {
+        let event = RealmEvent::Deregister;
+        inner.dispatcher.dispatch(&event, &client[0]);
+      }).ok_or(RealmError::InexistentId)?;
     inner.writer.empty(id);
     inner.writer.refresh();
     Ok(())
   }
 
-  pub fn update<F>(&self, id: RealmServerId, mutator: F) -> Result<()>
+  pub fn update<F>(&self, id: RealmServerId, mutator: F) -> Result<(), RealmError>
   where
     F: FnOnce(&mut RealmServer),
   {
@@ -125,7 +135,7 @@ impl RealmBrowser {
     let mut realm = inner
       .writer
       .get_and(&id, |realm| realm[0].clone())
-      .ok_or_else(|| Context::new("Non existent realm ID"))?;
+      .ok_or(RealmError::InexistentId)?;
 
     mutator(&mut realm);
     inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
@@ -139,11 +149,15 @@ impl RealmBrowser {
     self.reader.for_each(|_, realm| func(&realm[0]));
   }
 
-  pub fn get<R, F: FnOnce(&RealmServer) -> R>(&self, id: RealmServerId, func: F) -> Result<R> {
+  pub fn get<R, F: FnOnce(&RealmServer) -> R>(
+    &self,
+    id: RealmServerId,
+    func: F,
+  ) -> Result<R, RealmError> {
     self
       .reader
       .get_and(&id, |realm| func(&realm[0]))
-      .ok_or_else(|| Context::new("Non existent realm ID").into())
+      .ok_or(RealmError::InexistentId)
   }
 
   pub fn len(&self) -> usize {
