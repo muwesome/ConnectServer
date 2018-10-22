@@ -1,5 +1,5 @@
 use self::error::ClientSessionError;
-use self::util::TcpStreamSocket;
+use self::util::{packet_limiter, TcpStreamSocket};
 use super::ClientServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use futures::{Future, Sink, Stream};
@@ -33,12 +33,12 @@ pub fn process(
     .split();
 
   let session = reader
-    // Limit the number of client requests allowed
-    .take(config.max_requests as u64)
     // Prevent idle clients from reserving resources
     .timeout(config.max_idle_time)
     // Determine whether it's a timeout or stream error
     .map_err(ClientSessionError::from)
+    // Limit the number of client requests allowed
+    .and_then(packet_limiter(config.max_requests))
     // Map each packet to a corresponding response
     .and_then(closet!([config, realms] move |packet| respond(&config, &realms, &packet)))
     // Ignore any empty responses

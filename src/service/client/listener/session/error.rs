@@ -24,6 +24,9 @@ pub enum ClientSessionError {
   #[fail(display = "Invalid client IP version")]
   InvalidIpVersion,
 
+  #[fail(display = "Maximum packet count exceeded")]
+  MaxPacketsExceeded,
+
   #[fail(display = "Realm state error")]
   RealmState(#[fail(cause)] RealmError),
 
