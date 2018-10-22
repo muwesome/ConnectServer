@@ -9,7 +9,7 @@ macro_rules! matches {
 }
 
 #[macro_export]
-macro_rules! opt_match {
+macro_rules! match_opt {
   ($expression:expr, $(|)* $pattern:pat $(|$pattern_extra:pat)* $(if $ifguard:expr)* => $result:expr) => {
     match $expression {
       $pattern $(|$pattern_extra)* $(if $ifguard)* => Some($result),
