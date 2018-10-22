@@ -5,7 +5,7 @@ use std::time::Duration;
 use structopt::StructOpt;
 
 #[cfg_attr(feature = "build-binary", derive(StructOpt))]
-pub struct ClientServiceConfig {
+pub struct ConnectServiceConfig {
   #[cfg_attr(
     feature = "build-binary",
     structopt(
@@ -100,7 +100,7 @@ pub struct ClientServiceConfig {
   pub ignore_unknown_packets: bool,
 }
 
-impl ClientServiceConfig {
+impl ConnectServiceConfig {
   pub fn socket(&self) -> SocketAddrV4 {
     SocketAddrV4::new(self.host, self.port)
   }

@@ -1,4 +1,4 @@
-use super::ClientServiceConfig;
+use super::ConnectServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::CloseSignal, Result};
 use failure::{Context, Fail, ResultExt};
@@ -10,7 +10,7 @@ mod session;
 
 /// Starts listening for incoming connections.
 pub fn serve(
-  config: ClientServiceConfig,
+  config: ConnectServiceConfig,
   realms: RealmBrowser,
   clients: ClientPool,
   close_rx: CloseSignal,

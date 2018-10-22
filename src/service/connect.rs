@@ -1,4 +1,4 @@
-pub use self::config::ClientServiceConfig;
+pub use self::config::ConnectServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::ThreadController, Result};
 
@@ -6,13 +6,13 @@ mod config;
 mod listener;
 
 /// Wraps the underlying connect server thread.
-pub struct ClientService(ThreadController);
+pub struct ConnectService(ThreadController);
 
-impl ClientService {
+impl ConnectService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(config: ClientServiceConfig, realms: RealmBrowser, clients: ClientPool) -> Self {
+  pub fn spawn(config: ConnectServiceConfig, realms: RealmBrowser, clients: ClientPool) -> Self {
     let ctl = ThreadController::spawn(move |rx| listener::serve(config, realms, clients, rx));
-    ClientService(ctl)
+    ConnectService(ctl)
   }
 
   /// Returns whether the service is still active or not.

@@ -1,5 +1,5 @@
 use crate::observer::EventObserver;
-use crate::service::{ClientService, RpcService};
+use crate::service::{ConnectService, RpcService};
 use crate::state::{ClientPool, RealmBrowser};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -30,7 +30,7 @@ type Result<T> = ::std::result::Result<T, failure::Error>;
 )]
 pub struct ConnectConfig {
   #[cfg_attr(feature = "build-binary", structopt(flatten))]
-  pub client: service::ClientServiceConfig,
+  pub connect: service::ConnectServiceConfig,
   #[cfg_attr(feature = "build-binary", structopt(flatten))]
   pub rpc: service::RpcServiceConfig,
 }
@@ -39,7 +39,7 @@ pub struct ConnectConfig {
 pub struct ConnectServer {
   #[allow(dead_code)]
   observer: Arc<Mutex<EventObserver>>,
-  client_service: ClientService,
+  connect_service: ConnectService,
   rpc_service: RpcService,
 }
 
@@ -49,39 +49,39 @@ impl ConnectServer {
     // TODO: Exposing awareness of 'max_connections' here?
     let realms = RealmBrowser::new();
     let clients = ClientPool::new(
-      config.client.max_connections,
-      config.client.max_connections_per_ip,
+      config.connect.max_connections,
+      config.connect.max_connections_per_ip,
     );
 
     let observer = Arc::new(Mutex::new(EventObserver));
     realms.add_listener(&observer);
     clients.add_listener(&observer);
 
-    let client_service = ClientService::spawn(config.client, realms.clone(), clients);
+    let connect_service = ConnectService::spawn(config.connect, realms.clone(), clients);
     let rpc_service = RpcService::spawn(config.rpc, realms);
 
     Ok(ConnectServer {
       observer,
       rpc_service,
-      client_service,
+      connect_service,
     })
   }
 
   /// Returns whether the server is still active or not.
   pub fn is_active(&self) -> bool {
-    self.client_service.is_active()
+    self.connect_service.is_active()
   }
 
   /// Stops the server.
   pub fn stop(self) -> Result<()> {
-    let result = self.client_service.stop();
+    let result = self.connect_service.stop();
     self.rpc_service.stop()?;
     result
   }
 
   /// Will block, waiting for the server to finish.
   pub fn wait(self) -> Result<()> {
-    let result = self.client_service.wait();
+    let result = self.connect_service.wait();
     self.rpc_service.stop()?;
     result
   }

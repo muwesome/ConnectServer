@@ -1,6 +1,6 @@
 use self::error::ClientSessionError;
 use self::util::{packet_limiter, TcpStreamSocket};
-use super::ClientServiceConfig;
+use super::ConnectServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use futures::{Future, Sink, Stream};
 use muonline_packet::{Packet, PacketEncodable, XOR_CIPHER};
@@ -16,7 +16,7 @@ mod util;
 
 /// Setups and spawns a new session for a client.
 pub fn process(
-  config: &Arc<ClientServiceConfig>,
+  config: &Arc<ConnectServiceConfig>,
   realms: &RealmBrowser,
   clients: &ClientPool,
   stream: TcpStream,
@@ -69,7 +69,7 @@ pub fn process(
 
 /// Constructs a server response for each client packet.
 fn respond(
-  config: &ClientServiceConfig,
+  config: &ConnectServiceConfig,
   realms: &RealmBrowser,
   packet: &Packet,
 ) -> Result<Option<Packet>, ClientSessionError> {
