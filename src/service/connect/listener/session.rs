@@ -16,7 +16,7 @@ mod util;
 
 /// Setups and spawns a new session for a client.
 pub fn process(
-  config: &Arc<ConnectServiceConfig>,
+  config: &Arc<impl ConnectServiceConfig>,
   realms: &RealmBrowser,
   clients: &ClientPool,
   stream: TcpStream,
@@ -26,7 +26,7 @@ pub fn process(
     .add(stream.peer_addr_v4()?)
     .map_err(ClientSessionError::ClientState)?;
 
-  let (writer, reader) = codec(config.max_packet_size)
+  let (writer, reader) = codec(config.max_packet_size())
     // Use a non C3/C4 encrypted TCP codec
     .framed(stream)
     // Split the stream value into two separate handles
@@ -34,20 +34,20 @@ pub fn process(
 
   let session = reader
     // Prevent idle clients from reserving resources
-    .timeout(config.max_idle_time)
+    .timeout(config.max_idle_time())
     // Determine whether it's a timeout or stream error
     .map_err(ClientSessionError::from)
     // Limit the number of client requests allowed
-    .and_then(packet_limiter(config.max_requests))
+    .and_then(packet_limiter(config.max_requests()))
     // Map each packet to a corresponding response
-    .and_then(closet!([config, realms] move |packet| respond(&config, &realms, &packet)))
+    .and_then(closet!([config, realms] move |packet| respond(&*config, &realms, &packet)))
     // Ignore any empty responses
     .filter_map(|packet| packet)
     // Forward the packets to the client
     .fold(writer, closet!([config] move |sink, packet| {
       sink
         .send(packet)
-        .timeout(config.max_unresponsive_time)
+        .timeout(config.max_unresponsive_time())
         .map_err(ClientSessionError::from)
     }))
     // Remove the client from the service state
@@ -69,7 +69,7 @@ pub fn process(
 
 /// Constructs a server response for each client packet.
 fn respond(
-  config: &ConnectServiceConfig,
+  config: &impl ConnectServiceConfig,
   realms: &RealmBrowser,
   packet: &Packet,
 ) -> Result<Option<Packet>, ClientSessionError> {
@@ -106,7 +106,7 @@ fn respond(
         .map(Some)
     }
     _ => {
-      if config.ignore_unknown_packets {
+      if config.ignore_unknown_packets() {
         Ok(None)
       } else {
         Err(ClientSessionError::UnknownPacket {

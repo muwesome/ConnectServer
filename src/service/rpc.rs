@@ -13,7 +13,7 @@ mod proto;
 pub struct RpcService(ThreadController);
 
 impl RpcService {
-  pub fn spawn(config: RpcServiceConfig, realms: RealmBrowser) -> Self {
+  pub fn spawn(config: impl RpcServiceConfig, realms: RealmBrowser) -> Self {
     let ctl = ThreadController::spawn(move |rx| Self::serve(config, realms, rx));
     RpcService(ctl)
   }
@@ -22,13 +22,17 @@ impl RpcService {
     self.0.stop()
   }
 
-  fn serve(config: RpcServiceConfig, realms: RealmBrowser, close_rx: CloseSignal) -> Result<()> {
+  fn serve(
+    config: impl RpcServiceConfig,
+    realms: RealmBrowser,
+    close_rx: CloseSignal,
+  ) -> Result<()> {
     let service = proto::create_realm_service(listener::RpcListener::new(realms, close_rx.clone()));
 
     let environment = Arc::new(Environment::new(1));
     let mut server = ServerBuilder::new(environment)
       .register_service(service)
-      .bind(config.rpc_host, config.rpc_port)
+      .bind(config.host(), config.port())
       .build()
       .context("Failed to build service")?;
 

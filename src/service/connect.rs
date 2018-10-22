@@ -10,7 +10,11 @@ pub struct ConnectService(ThreadController);
 
 impl ConnectService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(config: ConnectServiceConfig, realms: RealmBrowser, clients: ClientPool) -> Self {
+  pub fn spawn(
+    config: impl ConnectServiceConfig,
+    realms: RealmBrowser,
+    clients: ClientPool,
+  ) -> Self {
     let ctl = ThreadController::spawn(move |rx| listener::serve(config, realms, clients, rx));
     ConnectService(ctl)
   }

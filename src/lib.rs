@@ -1,14 +1,14 @@
 use crate::observer::EventObserver;
-use crate::service::{ConnectService, RpcService};
+use crate::service::{ConnectService, ConnectServiceConfig, RpcService};
 use crate::state::{ClientPool, RealmBrowser};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-#[cfg(feature = "build-binary")]
-use structopt::StructOpt;
+pub use crate::config::ConnectConfig;
 
 #[macro_use]
 mod util;
+mod config;
 mod observer;
 mod service;
 mod state;
@@ -18,22 +18,9 @@ mod state;
 // TODO: Check error with invalid RPC host
 // TODO: Parse arguments from TOML as well
 // TODO: Use structured logging
-// TODO: Config separated or not?
 
 /// Default result type used.
 type Result<T> = ::std::result::Result<T, failure::Error>;
-
-#[cfg_attr(feature = "build-binary", derive(StructOpt))]
-#[cfg_attr(
-  feature = "build-binary",
-  structopt(about = "Mu Online Connect Server")
-)]
-pub struct ConnectConfig {
-  #[cfg_attr(feature = "build-binary", structopt(flatten))]
-  pub connect: service::ConnectServiceConfig,
-  #[cfg_attr(feature = "build-binary", structopt(flatten))]
-  pub rpc: service::RpcServiceConfig,
-}
 
 /// The server object.
 pub struct ConnectServer {
@@ -46,19 +33,15 @@ pub struct ConnectServer {
 impl ConnectServer {
   /// Spawns a new Connect Server using defaults.
   pub fn spawn(config: ConnectConfig) -> Result<Self> {
-    // TODO: Exposing awareness of 'max_connections' here?
     let realms = RealmBrowser::new();
-    let clients = ClientPool::new(
-      config.connect.max_connections,
-      config.connect.max_connections_per_ip,
-    );
+    let clients = ClientPool::new(config.max_connections(), config.max_connections_per_ip());
 
     let observer = Arc::new(Mutex::new(EventObserver));
     realms.add_listener(&observer);
     clients.add_listener(&observer);
 
-    let connect_service = ConnectService::spawn(config.connect, realms.clone(), clients);
-    let rpc_service = RpcService::spawn(config.rpc, realms);
+    let connect_service = ConnectService::spawn(config.clone(), realms.clone(), clients);
+    let rpc_service = RpcService::spawn(config, realms);
 
     Ok(ConnectServer {
       observer,

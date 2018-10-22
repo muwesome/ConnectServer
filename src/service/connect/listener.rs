@@ -10,7 +10,7 @@ mod session;
 
 /// Starts listening for incoming connections.
 pub fn serve(
-  config: ConnectServiceConfig,
+  config: impl ConnectServiceConfig,
   realms: RealmBrowser,
   clients: ClientPool,
   close_rx: CloseSignal,
