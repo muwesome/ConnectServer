@@ -14,6 +14,7 @@ mod observer;
 mod service;
 mod state;
 
+// TODO: Send client IP + port with span to realm server?
 // TODO: Fix local packet dependencies
 // TODO: Parse arguments from TOML as well
 // TODO: Use structured logging

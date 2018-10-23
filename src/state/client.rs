@@ -98,7 +98,7 @@ impl ClientPool {
     inner.dispatcher.add_listener(listener);
   }
 
-  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientId, ClientError> {
+  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientHandle, ClientError> {
     // TODO: Should these conditions be checked externally?
     if self.reader.len() >= self.capacity {
       Err(ClientError::MaxCapacity)?;
@@ -116,26 +116,11 @@ impl ClientPool {
     inner.writer.insert(client_id, client);
     inner.writer.refresh();
 
-    Ok(client_id)
-  }
-
-  pub fn remove(&self, id: ClientId) -> Result<(), ClientError> {
-    let mut inner = self.inner.lock();
-
-    inner
-      .pool
-      .return_id(id)
-      .map_err(|_| ClientError::InexistentId)?;
-    self
-      .reader
-      .get_and(&id, |client| {
-        let event = ClientEvent::Disconnect;
-        inner.dispatcher.dispatch(&event, &client[0]);
-      }).ok_or(ClientError::InexistentId)?;
-
-    inner.writer.empty(id);
-    inner.writer.refresh();
-    Ok(())
+    Ok(ClientHandle {
+      inner: self.inner.clone(),
+      reader: self.reader.clone(),
+      id: client_id,
+    })
   }
 
   /// Returns the number of clients for an IP address.
@@ -147,5 +132,28 @@ impl ClientPool {
       }
     });
     ip_clients
+  }
+}
+
+pub struct ClientHandle {
+  inner: Arc<Mutex<ClientPoolInner>>,
+  reader: ClientReader,
+  id: ClientId,
+}
+
+impl Drop for ClientHandle {
+  fn drop(&mut self) {
+    let mut inner = self.inner.lock();
+
+    inner.pool.return_id(self.id).expect("Invalid pool state");
+    self
+      .reader
+      .get_and(&self.id, |client| {
+        let event = ClientEvent::Disconnect;
+        inner.dispatcher.dispatch(&event, &client[0]);
+      }).expect("Invalid pool state");
+
+    inner.writer.empty(self.id);
+    inner.writer.refresh();
   }
 }
