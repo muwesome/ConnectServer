@@ -1,9 +1,10 @@
 pub use self::config::ConnectServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use crate::{util::ThreadController, Result};
+use std::sync::Arc;
 
+mod client;
 mod config;
-mod listener;
 
 /// A connect service instance.
 pub struct ConnectService(ThreadController);
@@ -11,11 +12,14 @@ pub struct ConnectService(ThreadController);
 impl ConnectService {
   /// Spawns a new Connect Service instance.
   pub fn spawn(
-    config: impl ConnectServiceConfig,
+    config: Arc<impl ConnectServiceConfig>,
     realms: RealmBrowser,
     clients: ClientPool,
   ) -> Self {
-    let ctl = ThreadController::spawn(move |rx| listener::serve(config, realms, clients, rx));
+    let ctl = ThreadController::spawn(move |close_signal| {
+      client::listen(&config, close_signal, client::handler(&config, &clients, &realms))
+    });
+
     ConnectService(ctl)
   }
 

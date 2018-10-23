@@ -27,8 +27,8 @@ pub struct RpcService(ThreadController);
 
 impl RpcService {
   /// Spawns a new RPC service instance.
-  pub fn spawn(config: impl RpcServiceConfig, realms: RealmBrowser) -> Self {
-    let ctl = ThreadController::spawn(move |rx| Self::serve(config, realms, rx));
+  pub fn spawn(config: Arc<impl RpcServiceConfig>, realms: RealmBrowser) -> Self {
+    let ctl = ThreadController::spawn(move |rx| Self::serve(&config, realms, rx));
     RpcService(ctl)
   }
 
@@ -43,7 +43,7 @@ impl RpcService {
   }
 
   fn serve(
-    config: impl RpcServiceConfig,
+    config: &Arc<impl RpcServiceConfig>,
     realms: RealmBrowser,
     close_rx: CloseSignal,
   ) -> Result<()> {

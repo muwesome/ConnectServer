@@ -36,6 +36,7 @@ impl ConnectServer {
   pub fn spawn(config: ConnectConfig) -> Result<Self> {
     let realms = RealmBrowser::new();
     let clients = ClientPool::new(config.max_connections(), config.max_connections_per_ip());
+    let config = Arc::new(config);
 
     let observer = Arc::new(Mutex::new(EventObserver));
     realms.add_listener(&observer);
