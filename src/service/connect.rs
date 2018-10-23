@@ -17,7 +17,11 @@ impl ConnectService {
     clients: ClientPool,
   ) -> Self {
     let ctl = ThreadController::spawn(move |close_signal| {
-      client::listen(&config, close_signal, client::handler(&config, &clients, &realms))
+      client::listen(
+        &config,
+        close_signal,
+        client::handler(&config, &clients, &realms),
+      )
     });
 
     ConnectService(ctl)

@@ -54,7 +54,7 @@ impl ConnectServer {
 
   /// Returns whether the server is still active or not.
   pub fn is_active(&self) -> bool {
-    // TODO: Disable connect service if RPC fails?
+    // TODO: Disable connect service if RPC fails & vice versa?
     self.connect_service.is_active() && self.rpc_service.is_active()
   }
 

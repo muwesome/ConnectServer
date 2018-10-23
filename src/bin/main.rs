@@ -5,6 +5,13 @@ use std::sync::Arc;
 use std::{thread, time::Duration};
 use structopt::StructOpt;
 
+#[derive(StructOpt)]
+#[structopt(about = "Mu Online Connect Server")]
+pub struct Config {
+  #[structopt(flatten)]
+  pub connect: ConnectConfig,
+}
+
 fn run() -> Result<(), Error> {
   let running = Arc::new(AtomicBool::new(true));
   let runningc = running.clone();
@@ -15,8 +22,8 @@ fn run() -> Result<(), Error> {
   }).context("Error setting interrupt handler")?;
 
   // Parse any CLI arguments
-  let config = ConnectConfig::from_args();
-  let server = ConnectServer::spawn(config).context("Error trying to spawn connect server")?;
+  let Config { connect } = Config::from_args();
+  let server = ConnectServer::spawn(connect).context("Error trying to spawn connect server")?;
 
   while server.is_active() && running.load(Ordering::SeqCst) {
     thread::sleep(Duration::from_millis(100));
