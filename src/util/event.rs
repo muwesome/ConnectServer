@@ -1,19 +1,12 @@
-use parking_lot::Mutex;
 use std::sync::{Arc, Weak};
 
-pub trait Event: Send + Sync {
-  type Context;
+pub trait Listener {}
+
+pub struct Dispatcher<T: Listener + ?Sized> {
+  listeners: Vec<Weak<T>>,
 }
 
-pub trait Listener<T: Event> {
-  fn on_event(&mut self, event: &T, context: &T::Context);
-}
-
-pub struct Dispatcher<T: Send + Sync> {
-  listeners: Vec<Weak<Mutex<Listener<T> + Send + Sync + 'static>>>,
-}
-
-impl<T: Event> Dispatcher<T> {
+impl<T: Listener + ?Sized> Dispatcher<T> {
   /// Creates an empty event dispatcher.
   pub fn new() -> Self {
     Dispatcher {
@@ -22,25 +15,19 @@ impl<T: Event> Dispatcher<T> {
   }
 
   /// Adds a new listener.
-  pub fn add_listener<L>(&mut self, listener: &Arc<Mutex<L>>)
-  where
-    L: Listener<T> + Send + Sync + 'static,
-  {
-    self.listeners.push(Arc::downgrade(
-      &(Arc::clone(listener) as Arc<Mutex<Listener<T> + Send + Sync + 'static>>),
-    ));
+  pub fn add_listener(&mut self, listener: &Arc<T>) {
+    self.listeners.push(Arc::downgrade(listener));
   }
 
   // Dispatches an event to all listeners.
-  pub fn dispatch(&mut self, event: &T, context: &T::Context) {
-    self.listeners.retain(|listener| {
-      if let Some(listener) = listener.upgrade() {
-        let mut listener = listener.lock();
-        listener.on_event(event, &context);
-        true
-      } else {
-        false
-      }
-    });
+  pub fn dispatch<'a, F, R>(&'a mut self, f: F) -> impl Iterator<Item = R> + 'a
+  where
+    F: Fn(&T) -> R + 'a,
+  {
+    self
+      .listeners
+      .iter()
+      .filter_map(|listener| listener.upgrade())
+      .map(move |listener| f(&*listener))
   }
 }

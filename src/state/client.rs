@@ -1,4 +1,4 @@
-use crate::util::{Dispatcher, Event, Listener};
+use crate::util::{Dispatcher, Listener};
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use index_pool::IndexPool;
@@ -33,13 +33,9 @@ impl ShallowCopy for Client {
   }
 }
 
-pub enum ClientEvent {
-  Connect,
-  Disconnect,
-}
-
-impl Event for ClientEvent {
-  type Context = Client;
+pub trait ClientListener: Listener + Send + Sync {
+  fn on_connect(&self, _client: &Client) {}
+  fn on_disconnect(&self, _client: &Client) {}
 }
 
 #[derive(Fail, Debug)]
@@ -61,7 +57,7 @@ type ClientReader = ReadHandle<ClientId, Client, (), RandomState>;
 type ClientWriter = WriteHandle<ClientId, Client, (), RandomState>;
 
 struct ClientPoolInner {
-  dispatcher: Dispatcher<ClientEvent>,
+  dispatcher: Dispatcher<ClientListener>,
   writer: ClientWriter,
   pool: IndexPool,
 }
@@ -90,10 +86,7 @@ impl ClientPool {
     }
   }
 
-  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>)
-  where
-    L: Listener<ClientEvent> + Send + Sync + 'static,
-  {
+  pub fn add_listener(&self, listener: &Arc<ClientListener>) {
     let mut inner = self.inner.lock();
     inner.dispatcher.add_listener(listener);
   }
@@ -112,7 +105,7 @@ impl ClientPool {
     let client_id = inner.pool.new_id();
     let client = Client::new(client_id, socket);
 
-    inner.dispatcher.dispatch(&ClientEvent::Connect, &client);
+    inner.dispatcher.dispatch(|l| l.on_connect(&client));
     inner.writer.insert(client_id, client);
     inner.writer.refresh();
 
@@ -149,8 +142,7 @@ impl Drop for ClientHandle {
     self
       .reader
       .get_and(&self.id, |client| {
-        let event = ClientEvent::Disconnect;
-        inner.dispatcher.dispatch(&event, &client[0]);
+        inner.dispatcher.dispatch(|l| l.on_disconnect(&client[0]));
       }).expect("Invalid pool state");
 
     inner.writer.empty(self.id);

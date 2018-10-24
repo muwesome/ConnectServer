@@ -2,7 +2,6 @@ use crate::observer::EventObserver;
 use crate::service::{ConnectService, ConnectServiceConfig, RpcService};
 use crate::state::{ClientPool, RealmBrowser};
 use failure::ResultExt;
-use parking_lot::Mutex;
 use std::sync::Arc;
 
 pub use crate::config::ConnectConfig;
@@ -27,7 +26,7 @@ type Result<T> = std::result::Result<T, failure::Error>;
 /// The server object.
 pub struct ConnectServer {
   #[allow(dead_code)]
-  observer: Arc<Mutex<EventObserver>>,
+  observer: Arc<EventObserver>,
   connect_service: ConnectService,
   rpc_service: RpcService,
 }
@@ -39,9 +38,9 @@ impl ConnectServer {
     let clients = ClientPool::new(config.max_connections(), config.max_connections_per_ip());
     let config = Arc::new(config);
 
-    let observer = Arc::new(Mutex::new(EventObserver));
-    realms.add_listener(&observer);
-    clients.add_listener(&observer);
+    let observer = Arc::new(EventObserver);
+    realms.add_listener(&(observer.clone() as Arc<state::RealmListener>));
+    clients.add_listener(&(observer.clone() as Arc<state::ClientListener>));
 
     let connect_service = ConnectService::spawn(config.clone(), realms.clone(), clients);
     let rpc_service = RpcService::spawn(config, realms);

@@ -1,4 +1,4 @@
-use crate::util::{Dispatcher, Event, Listener};
+use crate::util::{Dispatcher, Listener};
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use parking_lot::Mutex;
@@ -46,14 +46,10 @@ impl ShallowCopy for RealmServer {
   }
 }
 
-pub enum RealmEvent {
-  Register,
-  Deregister,
-  Update,
-}
-
-impl Event for RealmEvent {
-  type Context = RealmServer;
+pub trait RealmListener: Listener + Send + Sync {
+  fn on_register(&self, _realm: &RealmServer) {}
+  fn on_deregister(&self, _realm: &RealmServer) {}
+  fn on_update(&self, _realm: &RealmServer) {}
 }
 
 #[derive(Fail, Debug)]
@@ -72,7 +68,7 @@ type RealmReader = ReadHandle<RealmServerId, RealmServer, (), RandomState>;
 type RealmWriter = WriteHandle<RealmServerId, RealmServer, (), RandomState>;
 
 struct RealmBrowserInner {
-  dispatcher: Dispatcher<RealmEvent>,
+  dispatcher: Dispatcher<RealmListener>,
   writer: RealmWriter,
 }
 
@@ -94,10 +90,7 @@ impl RealmBrowser {
     }
   }
 
-  pub fn add_listener<L>(&self, listener: &Arc<Mutex<L>>)
-  where
-    L: Listener<RealmEvent> + Send + Sync + 'static,
-  {
+  pub fn add_listener(&self, listener: &Arc<RealmListener>) {
     let mut inner = self.inner.lock();
     inner.dispatcher.add_listener(listener);
   }
@@ -108,7 +101,7 @@ impl RealmBrowser {
     }
 
     let mut inner = self.inner.lock();
-    inner.dispatcher.dispatch(&RealmEvent::Register, &realm);
+    inner.dispatcher.dispatch(|l| l.on_register(&realm));
     inner.writer.insert(realm.id, realm);
     inner.writer.refresh();
     Ok(())
@@ -118,9 +111,8 @@ impl RealmBrowser {
     let mut inner = self.inner.lock();
     self
       .reader
-      .get_and(&id, |client| {
-        let event = RealmEvent::Deregister;
-        inner.dispatcher.dispatch(&event, &client[0]);
+      .get_and(&id, |realm| {
+        inner.dispatcher.dispatch(|l| l.on_deregister(&realm[0]));
       }).ok_or(RealmError::InexistentId)?;
     inner.writer.empty(id);
     inner.writer.refresh();
@@ -138,7 +130,7 @@ impl RealmBrowser {
       .ok_or(RealmError::InexistentId)?;
 
     mutator(&mut realm);
-    inner.dispatcher.dispatch(&RealmEvent::Update, &realm);
+    inner.dispatcher.dispatch(|l| l.on_update(&realm));
 
     inner.writer.update(id, realm);
     inner.writer.refresh();

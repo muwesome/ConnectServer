@@ -1,24 +1,31 @@
-use crate::state::{Client, ClientEvent, RealmEvent, RealmServer};
+use crate::state::{Client, ClientListener, RealmListener, RealmServer};
 use crate::util::Listener;
 use log::info;
 
 pub struct EventObserver;
 
-impl Listener<ClientEvent> for EventObserver {
-  fn on_event(&mut self, event: &ClientEvent, client: &Client) {
-    match event {
-      ClientEvent::Connect => info!("Client connected: {}", &client),
-      ClientEvent::Disconnect => info!("Client disconnected: {}", client),
-    }
+impl Listener for EventObserver {}
+
+impl ClientListener for EventObserver {
+  fn on_connect(&self, client: &Client) {
+    info!("Client connected: {}", &client);
+  }
+
+  fn on_disconnect(&self, client: &Client) {
+    info!("Client disconnected: {}", client);
   }
 }
 
-impl Listener<RealmEvent> for EventObserver {
-  fn on_event(&mut self, event: &RealmEvent, realm: &RealmServer) {
-    match event {
-      RealmEvent::Register => info!("Realm registered: {}", &realm),
-      RealmEvent::Deregister => info!("Realm deregistered: {}", &realm),
-      RealmEvent::Update => info!("Realm updated: {}", &realm),
-    }
+impl RealmListener for EventObserver {
+  fn on_register(&self, realm: &RealmServer) {
+    info!("Realm registered: {}", &realm);
+  }
+
+  fn on_deregister(&self, realm: &RealmServer) {
+    info!("Realm deregistered: {}", &realm);
+  }
+
+  fn on_update(&self, realm: &RealmServer) {
+    info!("Realm updated: {}", &realm);
   }
 }

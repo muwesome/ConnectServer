@@ -13,7 +13,6 @@ pub fn listen(
   close_signal: CloseSignal,
   client_handler: impl FnMut(TcpStream) -> Result<()> + Send + 'static,
 ) -> Result<()> {
-  let config = Arc::new(config);
   let close_signal =
     close_signal.map_err(|_| Context::new("Controller channel closed prematurely").into());
 
