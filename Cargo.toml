@@ -10,7 +10,7 @@ lto = "thin"
 
 [[bin]]
 doc = false
-name = "mu-cs"
+name = "mucs"
 path = "src/bin/main.rs"
 required-features = ["build-binary"]
 
