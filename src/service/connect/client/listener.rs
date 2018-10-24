@@ -1,6 +1,6 @@
 use crate::service::ConnectServiceConfig;
 use crate::{util::CloseSignal, Result};
-use failure::{Context, Fail, ResultExt};
+use failure::{format_err, Fail, ResultExt};
 use futures::{Future, Stream};
 use log::{error, info};
 use std::sync::Arc;
@@ -13,8 +13,7 @@ pub fn listen(
   close_signal: CloseSignal,
   client_handler: impl FnMut(TcpStream) -> Result<()> + Send + 'static,
 ) -> Result<()> {
-  let close_signal =
-    close_signal.map_err(|_| Context::new("Controller channel closed prematurely").into());
+  let close_signal = close_signal.map_err(|_| format_err!("Controller channel closed prematurely"));
 
   // Listen on the supplied TCP socket
   let listener =

@@ -1,5 +1,5 @@
 use crate::{state, Result};
-use failure::{Context, Error, ResultExt};
+use failure::{format_err, Error, ResultExt};
 use try_from::TryFrom;
 
 pub use self::connectserver::*;
@@ -22,7 +22,7 @@ impl TryFrom<RealmParams_RealmDefinition> for state::RealmServer {
     };
 
     if server.clients > server.capacity {
-      Err(Context::new("Invalid capacity specified"))?;
+      Err(format_err!("Invalid capacity specified"))?;
     }
 
     Ok(server)

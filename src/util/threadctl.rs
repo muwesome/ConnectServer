@@ -1,5 +1,5 @@
 use crate::Result;
-use failure::Context;
+use failure::format_err;
 use futures::{future::Shared, sync::oneshot, Async, Future, Poll};
 use log::error;
 use std::sync::Arc;
@@ -79,7 +79,7 @@ impl ThreadController {
       let close_result = inner
         .sender
         .send(())
-        .map_err(|_| Context::new("Thread receiver closed prematurely").into());
+        .map_err(|_| format_err!("Thread receiver closed prematurely"));
       Self::join_thread(inner.thread).and(close_result)?;
     }
     Ok(())
@@ -88,7 +88,7 @@ impl ThreadController {
   fn join_thread(thread: JoinHandle<Result<()>>) -> Result<()> {
     thread
       .join()
-      .map_err(|_| Context::new("Thread managed by controller panicked").into())
+      .map_err(|_| format_err!("Thread managed by controller panicked"))
       .and_then(|result| result)
   }
 }
