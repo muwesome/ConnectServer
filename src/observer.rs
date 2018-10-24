@@ -1,10 +1,10 @@
 use crate::state::{Client, ClientListener, RealmListener, RealmServer};
-use crate::util::Listener;
+use crate::util::Observer;
 use log::info;
 
 pub struct EventObserver;
 
-impl Listener for EventObserver {}
+impl Observer for EventObserver {}
 
 impl ClientListener for EventObserver {
   fn on_connect(&self, client: &Client) {

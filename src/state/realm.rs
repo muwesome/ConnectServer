@@ -1,4 +1,4 @@
-use crate::util::{Dispatcher, Listener};
+use crate::util::{Dispatcher, Observer};
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use parking_lot::Mutex;
@@ -46,7 +46,7 @@ impl ShallowCopy for RealmServer {
   }
 }
 
-pub trait RealmListener: Listener + Send + Sync {
+pub trait RealmListener: Observer + Send + Sync {
   fn on_register(&self, _realm: &RealmServer) {}
   fn on_deregister(&self, _realm: &RealmServer) {}
   fn on_update(&self, _realm: &RealmServer) {}

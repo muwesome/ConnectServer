@@ -1,12 +1,12 @@
 use std::sync::{Arc, Weak};
 
-pub trait Listener {}
+pub trait Observer {}
 
-pub struct Dispatcher<T: Listener + ?Sized> {
+pub struct Dispatcher<T: Observer + ?Sized> {
   listeners: Vec<Weak<T>>,
 }
 
-impl<T: Listener + ?Sized> Dispatcher<T> {
+impl<T: Observer + ?Sized> Dispatcher<T> {
   /// Creates an empty event dispatcher.
   pub fn new() -> Self {
     Dispatcher {

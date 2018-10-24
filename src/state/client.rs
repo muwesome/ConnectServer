@@ -1,4 +1,4 @@
-use crate::util::{Dispatcher, Listener};
+use crate::util::{Dispatcher, Observer};
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use index_pool::IndexPool;
@@ -33,7 +33,7 @@ impl ShallowCopy for Client {
   }
 }
 
-pub trait ClientListener: Listener + Send + Sync {
+pub trait ClientListener: Observer + Send + Sync {
   fn on_connect(&self, _client: &Client) {}
   fn on_disconnect(&self, _client: &Client) {}
 }
