@@ -3,6 +3,7 @@ use self::util::{packet_limiter, TcpStreamSocket};
 use crate::service::ConnectServiceConfig;
 use crate::state::{ClientPool, RealmBrowser};
 use futures::{future, Future, Sink, Stream};
+use log::error;
 use muonline_packet::{Packet, PacketEncodable, XOR_CIPHER};
 use muonline_packet::{PacketCodec, PacketCodecState};
 use muonline_protocol::connect::{self, server, Client};
@@ -46,7 +47,7 @@ fn process(
   tokio::spawn(session.then(|result| {
     if let Err(error) = result {
       if !error.connection_reset_by_peer() {
-        println!("Client session error: {}", error);
+        error!("Client session: {}", error);
       }
     }
     Ok(())

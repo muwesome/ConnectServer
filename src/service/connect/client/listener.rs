@@ -2,6 +2,7 @@ use crate::service::ConnectServiceConfig;
 use crate::{util::CloseSignal, Result};
 use failure::{Context, Fail, ResultExt};
 use futures::{Future, Stream};
+use log::{error, info};
 use std::sync::Arc;
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
@@ -33,11 +34,11 @@ pub fn listen(
     // Listen for any cancellation events from the controller
     .select(close_signal);
 
-  println!("Client listening on {}", local_addr);
+  info!("Connect service listening on {}", local_addr);
   tokio::run(
     server
       .map(|(item, _)| item)
-      .map_err(|(error, _)| println!("Connect Service: {}", error)),
+      .map_err(|(error, _)| error!("Connect service: {}", error)),
   );
   Ok(())
 }

@@ -1,4 +1,5 @@
 use failure::{Error, ResultExt};
+use log::{error, info, LevelFilter};
 use mucs::{ConnectConfig, ConnectServer};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -17,7 +18,7 @@ fn run() -> Result<(), Error> {
   let runningc = running.clone();
 
   ctrlc::set_handler(move || {
-    println!("Shutting down server...");
+    info!("Shutting down server...");
     runningc.store(false, Ordering::SeqCst);
   }).context("Error setting interrupt handler")?;
 
@@ -34,14 +35,22 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
+  match pretty_env_logger::formatted_builder() {
+    Ok(mut builder) => builder.filter_module("mu", LevelFilter::Trace).init(),
+    Err(error) => {
+      eprintln!("Failed to configure logger; {}", error);
+      std::process::exit(1);
+    }
+  }
+
   if let Err(error) = run() {
-    eprintln!("Runtime exit — {}", error);
+    error!("Runtime exit — {}", error);
     for cause in error.iter_causes() {
-      eprintln!(" — {}", cause);
+      error!("— {}", cause);
     }
 
     if std::env::var_os("RUST_BACKTRACE").is_some() {
-      eprintln!("{}", error.backtrace());
+      error!("{}", error.backtrace());
     }
 
     std::process::exit(1);

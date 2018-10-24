@@ -1,6 +1,7 @@
 use crate::Result;
 use failure::Context;
 use futures::{future::Shared, sync::oneshot, Async, Future, Poll};
+use log::error;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
@@ -95,7 +96,7 @@ impl ThreadController {
 impl Drop for ThreadController {
   fn drop(&mut self) {
     if let Err(error) = self.stop_and_join_thread() {
-      println!("Thread error during destructor: {}", error);
+      error!("Thread controller destructor: {}", error);
     }
   }
 }

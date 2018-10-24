@@ -4,6 +4,7 @@ use crate::{state::RealmBrowser, Result};
 use failure::Fail;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
+use log::info;
 use std::sync::Arc;
 
 mod config;
@@ -28,6 +29,7 @@ pub struct RpcService(ThreadController);
 impl RpcService {
   /// Spawns a new RPC service instance.
   pub fn spawn(config: Arc<impl RpcServiceConfig>, realms: RealmBrowser) -> Self {
+    grpcio::redirect_log();
     let ctl = ThreadController::spawn(move |rx| Self::serve(&config, realms, rx));
     RpcService(ctl)
   }
@@ -58,7 +60,7 @@ impl RpcService {
 
     server.start();
     for &(ref host, port) in server.bind_addrs() {
-      println!("RPC listening on {}:{}", host, port);
+      info!("RPC listening on {}:{}", host, port);
     }
 
     let close_result = close_rx

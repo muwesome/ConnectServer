@@ -3,6 +3,7 @@ use crate::state::{RealmBrowser, RealmServer};
 use crate::util::CloseSignal;
 use futures::{Future, Stream};
 use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatusCode};
+use log::error;
 use tap::TapResultOps;
 use try_from::TryFrom;
 
@@ -77,7 +78,7 @@ impl proto::RealmService for RpcListener {
             .remove(realm_id)
             .map_err(|error| rpcerr!(Internal, format!("Realm removal failed: {}", error)))
         ))
-      }).then(|result| result.tap_err(|error| println!("RPC client error: {:?}", error)));
+      }).then(|result| result.tap_err(|error| error!("RPC client: {:?}", error)));
 
     let close_signal = self
       .close_rx
@@ -95,7 +96,7 @@ impl proto::RealmService for RpcListener {
 
     let session = send_response.map_err(|error| {
       if !matches!(error, grpcio::Error::RemoteStopped) {
-        println!("RPC sink error: {}", error)
+        error!("RPC sink: {}", error)
       }
     });
 

@@ -30,9 +30,11 @@ structopt = { version = "0.2", optional = true }
 tap = "0.3"
 tokio = "0.1"
 try_from = "0.2"
+log = "0.4"
+pretty_env_logger = { version = "0.2", optional = true }
 
 [features]
-build-binary = ["ctrlc", "structopt"]
+build-binary = ["ctrlc", "structopt", "pretty_env_logger"]
 
 [build-dependencies]
 protoc-grpcio = "0.2"

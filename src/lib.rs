@@ -17,8 +17,9 @@ mod state;
 // TODO: Send client IP + port with span to realm server?
 // TODO: Fix local packet dependencies
 // TODO: Parse arguments from TOML as well
-// TODO: Use structured logging
-// TODO: Disable internal GRPC logger
+// TODO: Disable connect service if RPC fails & vice versa?
+// TODO: Refactor RPC listener
+// TODO: Improved listener/oberver?
 
 /// Default result type used.
 type Result<T> = std::result::Result<T, failure::Error>;
@@ -54,7 +55,6 @@ impl ConnectServer {
 
   /// Returns whether the server is still active or not.
   pub fn is_active(&self) -> bool {
-    // TODO: Disable connect service if RPC fails & vice versa?
     self.connect_service.is_active() && self.rpc_service.is_active()
   }
 
