@@ -1,7 +1,7 @@
 #[macro_use]
 mod macros;
-mod event;
+mod dispatch;
 mod threadctl;
 
-pub use self::event::{Dispatcher, Observer};
+pub use self::dispatch::Dispatcher;
 pub use self::threadctl::{CloseSignal, ThreadController};

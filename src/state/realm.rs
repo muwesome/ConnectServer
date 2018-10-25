@@ -1,4 +1,4 @@
-use crate::util::{Dispatcher, Observer};
+use crate::util::Dispatcher;
 use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use parking_lot::Mutex;
@@ -46,7 +46,7 @@ impl ShallowCopy for RealmServer {
   }
 }
 
-pub trait RealmListener: Observer + Send + Sync {
+pub trait RealmListener: Send + Sync {
   fn on_register(&self, _realm: &RealmServer) {}
   fn on_deregister(&self, _realm: &RealmServer) {}
   fn on_update(&self, _realm: &RealmServer) {}
@@ -90,9 +90,9 @@ impl RealmBrowser {
     }
   }
 
-  pub fn add_listener(&self, listener: &Arc<RealmListener>) {
-    let mut inner = self.inner.lock();
-    inner.dispatcher.add_listener(listener);
+  pub fn subscribe(&self, listener: &Arc<RealmListener>) {
+    let inner = self.inner.lock();
+    inner.dispatcher.subscribe(listener);
   }
 
   pub fn add(&self, realm: RealmServer) -> Result<(), RealmError> {

@@ -39,8 +39,8 @@ impl ConnectServer {
     let config = Arc::new(config);
 
     let observer = Arc::new(EventObserver);
-    realms.add_listener(&(observer.clone() as Arc<state::RealmListener>));
-    clients.add_listener(&(observer.clone() as Arc<state::ClientListener>));
+    realms.subscribe(&(observer.clone() as Arc<state::RealmListener>));
+    clients.subscribe(&(observer.clone() as Arc<state::ClientListener>));
 
     let connect_service = ConnectService::spawn(config.clone(), realms.clone(), clients);
     let rpc_service = RpcService::spawn(config, realms);
