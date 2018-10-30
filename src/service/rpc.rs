@@ -30,7 +30,7 @@ impl RpcService {
   /// Spawns a new RPC service instance.
   pub fn spawn(config: Arc<impl RpcServiceConfig>, realms: RealmBrowser) -> Self {
     grpcio::redirect_log();
-    let ctl = ThreadController::spawn(move |rx| Self::serve(&config, realms, rx));
+    let ctl = ThreadController::spawn(move |rx| Self::serve(&*config, realms, rx));
     RpcService(ctl)
   }
 
@@ -45,7 +45,7 @@ impl RpcService {
   }
 
   fn serve(
-    config: &Arc<impl RpcServiceConfig>,
+    config: &impl RpcServiceConfig,
     realms: RealmBrowser,
     close_rx: CloseSignal,
   ) -> Result<()> {

@@ -42,7 +42,7 @@ impl ConnectServer {
     realms.subscribe(&(observer.clone() as Arc<state::RealmListener>));
     clients.subscribe(&(observer.clone() as Arc<state::ClientListener>));
 
-    let connect_service = ConnectService::spawn(config.clone(), realms.clone(), clients);
+    let connect_service = ConnectService::spawn(config.clone(), clients, realms.clone());
     let rpc_service = RpcService::spawn(config, realms);
 
     Ok(ConnectServer {

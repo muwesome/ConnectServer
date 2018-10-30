@@ -16,7 +16,6 @@ required-features = ["build-binary"]
 
 [dependencies]
 ctrlc = { version = "3.1", optional = true }
-evmap = "4.0"
 failure = "0.1"
 futures = "0.1"
 grpcio = { version = "0.4", default-features = false, features = ["protobuf-codec"] }
@@ -32,6 +31,8 @@ tokio = "0.1"
 try_from = "0.2"
 log = "0.4"
 pretty_env_logger = { version = "0.2", optional = true }
+auto_impl = "0.3.0"
+chashmap = "2.2.0"
 
 [features]
 build-binary = ["ctrlc", "structopt", "pretty_env_logger"]

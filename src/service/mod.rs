@@ -1,4 +1,4 @@
-pub use self::connect::{ConnectService, ConnectServiceConfig};
+pub use self::connect::*;
 pub use self::rpc::{RpcService, RpcServiceConfig};
 
 mod connect;

@@ -1,9 +1,9 @@
+use chashmap::CHashMap;
 use crate::util::Dispatcher;
-use evmap::{self, ReadHandle, ShallowCopy, WriteHandle};
 use failure::Fail;
 use index_pool::IndexPool;
 use parking_lot::Mutex;
-use std::collections::hash_map::RandomState;
+use std::cell::Cell;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::{fmt, sync::Arc};
 
@@ -27,19 +27,13 @@ impl fmt::Display for Client {
   }
 }
 
-impl ShallowCopy for Client {
-  unsafe fn shallow_copy(&mut self) -> Self {
-    self.clone()
-  }
-}
-
 pub trait ClientListener: Send + Sync {
   fn on_connect(&self, _client: &Client) {}
   fn on_disconnect(&self, _client: &Client) {}
 }
 
 #[derive(Fail, Debug)]
-pub enum ClientError {
+pub enum ClientPoolError {
   #[fail(display = "Inexistent client ID")]
   InexistentId,
 
@@ -50,36 +44,27 @@ pub enum ClientError {
   MaxCapacityForIp(Ipv4Addr),
 }
 
-/// Realm server collection reader.
-type ClientReader = ReadHandle<ClientId, Client, (), RandomState>;
-
-/// Client server collection writer.
-type ClientWriter = WriteHandle<ClientId, Client, (), RandomState>;
-
 struct ClientPoolInner {
   dispatcher: Dispatcher<ClientListener>,
-  writer: ClientWriter,
   pool: IndexPool,
 }
 
 #[derive(Clone)]
 pub struct ClientPool {
   inner: Arc<Mutex<ClientPoolInner>>,
-  reader: ClientReader,
+  map: Arc<CHashMap<ClientId, Client>>,
   capacity: usize,
   capacity_per_ip: usize,
 }
 
 impl ClientPool {
   pub fn new(capacity: usize, capacity_per_ip: usize) -> Self {
-    let (reader, writer) = evmap::new();
     let inner = Arc::new(Mutex::new(ClientPoolInner {
       pool: IndexPool::new(),
       dispatcher: Dispatcher::new(),
-      writer,
     }));
     ClientPool {
-      reader,
+      map: Arc::new(CHashMap::new()),
       inner,
       capacity,
       capacity_per_ip,
@@ -91,14 +76,14 @@ impl ClientPool {
     inner.dispatcher.subscribe(listener);
   }
 
-  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientHandle, ClientError> {
+  pub fn add(&self, socket: SocketAddrV4) -> Result<ClientHandle, ClientPoolError> {
     // TODO: Should these conditions be checked externally?
-    if self.reader.len() >= self.capacity {
-      Err(ClientError::MaxCapacity)?;
+    if self.map.len() >= self.capacity {
+      Err(ClientPoolError::MaxCapacity)?;
     }
 
     if self.num_of_clients_for_ip(*socket.ip()) > self.capacity_per_ip - 1 {
-      Err(ClientError::MaxCapacityForIp(*socket.ip()))?;
+      Err(ClientPoolError::MaxCapacityForIp(*socket.ip()))?;
     }
 
     let mut inner = self.inner.lock();
@@ -106,31 +91,31 @@ impl ClientPool {
     let client = Client::new(client_id, socket);
 
     inner.dispatcher.dispatch(|l| l.on_connect(&client));
-    inner.writer.insert(client_id, client);
-    inner.writer.refresh();
+    self.map.insert_new(client_id, client);
 
     Ok(ClientHandle {
       inner: self.inner.clone(),
-      reader: self.reader.clone(),
+      map: self.map.clone(),
       id: client_id,
     })
   }
 
   /// Returns the number of clients for an IP address.
   fn num_of_clients_for_ip(&self, ip: Ipv4Addr) -> usize {
-    let mut ip_clients = 0;
-    self.reader.for_each(|_, client| {
-      if *client[0].socket.ip() == ip {
-        ip_clients += 1;
+    let ip_clients = Cell::new(0);
+    self.map.retain(|_, client| {
+      if *client.socket.ip() == ip {
+        ip_clients.set(ip_clients.get() + 1);
       }
+      true
     });
-    ip_clients
+    ip_clients.into_inner()
   }
 }
 
 pub struct ClientHandle {
   inner: Arc<Mutex<ClientPoolInner>>,
-  reader: ClientReader,
+  map: Arc<CHashMap<ClientId, Client>>,
   id: ClientId,
 }
 
@@ -140,12 +125,10 @@ impl Drop for ClientHandle {
 
     inner.pool.return_id(self.id).expect("Invalid pool state");
     self
-      .reader
-      .get_and(&self.id, |client| {
-        inner.dispatcher.dispatch(|l| l.on_disconnect(&client[0]));
-      }).expect("Invalid pool state");
-
-    inner.writer.empty(self.id);
-    inner.writer.refresh();
+      .map
+      .get(&self.id)
+      .map(|client| inner.dispatcher.dispatch(|l| l.on_disconnect(&client)))
+      .expect("Invalid pool state");
+    self.map.remove(&self.id);
   }
 }
