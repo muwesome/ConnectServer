@@ -37,7 +37,7 @@ pub trait PacketCodecProvider: Send + Sync + 'static {
 
 /// Returns the codec used for a Connect Server.
 pub fn codec(max_size: usize) -> PacketCodec {
-  PacketCodec::new_with_max_size(
+  PacketCodec::with_max_size(
     PacketCodecState::new(),
     PacketCodecState::builder().cipher(&XOR_CIPHER).build(),
     max_size,
