@@ -83,7 +83,7 @@ where
   }
 }
 
-/// Returns a packet limiter closure.
+/// Returns a packet limiter.
 fn packet_limiter<P>(limit: usize) -> impl FnMut(P) -> Result<P> {
   let mut counter = 0;
   move |packet| {

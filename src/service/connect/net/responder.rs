@@ -23,7 +23,7 @@ impl PacketResponder {
 }
 
 impl ClientPacketResponder for PacketResponder {
-  /// Constructs a response for each client packet.
+  /// Constructs a response for a client packet.
   fn respond(&self, packet: &Packet) -> Result<Option<Packet>> {
     match Client::from_packet(&packet).map_err(ClientError::InvalidPacket)? {
       Client::ConnectServerRequest(request) => {
