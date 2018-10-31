@@ -6,7 +6,6 @@ use std::net::{SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::TcpStream;
 
-#[derive(Clone)]
 pub struct ClientSessionDecorator<T: ClientStreamHandler> {
   clients: ClientPool,
   handler: Arc<T>,
@@ -43,7 +42,7 @@ fn peer_addr_v4(stream: &TcpStream) -> Result<SocketAddrV4> {
   let socket = stream
     .peer_addr()
     .map_err(ClientError::CannotResolveAddress)?;
-  match_opt!(socket, SocketAddr::V4(addr) => addr)
+  matches_opt!(socket, SocketAddr::V4(addr) => addr)
     .ok_or(ClientError::InvalidIpVersion)
     .map_err(From::from)
 }

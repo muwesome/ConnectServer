@@ -47,7 +47,7 @@ impl proto::RealmService for RpcListener {
       // Wait for the first input; the realm definition
       .and_then(|(input, stream)| {
         let input = input.ok_or_else(|| rpcerr!(Cancelled, "Missing input"))?;
-        let definition = match_opt!(input, proto::RealmParams_oneof_kind::definition(x) => x)
+        let definition = matches_opt!(input, proto::RealmParams_oneof_kind::definition(x) => x)
           .ok_or_else(|| rpcerr!(InvalidArgument, "Expected realm definition"))?;
 
         let realm = RealmServer::try_from(definition)
@@ -67,7 +67,7 @@ impl proto::RealmService for RpcListener {
       .and_then(move |(realm_id, stream)| {
         // Iterate over each status update
         stream.for_each(closet!([realms] move |input| {
-          let status = match_opt!(input, proto::RealmParams_oneof_kind::status(x) => x)
+          let status = matches_opt!(input, proto::RealmParams_oneof_kind::status(x) => x)
             .ok_or_else(|| rpcerr!(InvalidArgument, "Expected realm status"))?;
           realms.update(realm_id, |realm| {
             realm.clients = status.get_clients() as usize;
