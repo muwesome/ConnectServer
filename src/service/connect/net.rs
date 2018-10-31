@@ -4,9 +4,9 @@ use futures::Future;
 use muonline_packet::{Packet, PacketCodec, PacketCodecState, XOR_CIPHER};
 use tokio::net::TcpStream;
 
-pub use self::handler::StreamHandler;
+pub use self::handler::ClientStreamHandler;
 pub use self::listener::listen;
-pub use self::responder::PacketResponder;
+pub use self::responder::ClientPacketResponder;
 pub use self::session::ClientSessionDecorator;
 
 mod handler;
@@ -18,13 +18,13 @@ mod session;
 type ConnectServiceFuture<T> = Box<Future<Item = T, Error = ConnectServiceError> + Send + 'static>;
 
 #[auto_impl(Fn)]
-pub trait ClientStreamHandler: Send + Sync + 'static {
+pub trait StreamHandler: Send + Sync + 'static {
   /// Handles a new client stream, returning the session as a future.
   fn handle(&self, stream: TcpStream) -> ConnectServiceFuture<()>;
 }
 
 #[auto_impl(Fn)]
-pub trait ClientPacketResponder: Send + Sync + 'static {
+pub trait PacketResponder: Send + Sync + 'static {
   /// Constructs a response for a client packet.
   fn respond(&self, packet: &Packet) -> Result<Option<Packet>>;
 }

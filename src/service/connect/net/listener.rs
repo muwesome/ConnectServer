@@ -1,4 +1,4 @@
-use super::ClientStreamHandler;
+use super::StreamHandler;
 use crate::service::connect::error::{ConnectServiceError, Result, ServerError};
 use crate::util::CloseSignal;
 use futures::{Future, Stream};
@@ -9,7 +9,7 @@ use tokio::{self, net::TcpListener};
 /// Starts listening for incoming connections.
 pub fn listen(
   socket: SocketAddrV4,
-  client_handler: impl ClientStreamHandler,
+  stream_handler: impl StreamHandler,
   close_signal: CloseSignal,
 ) -> Result<()> {
   let close_signal =
@@ -29,7 +29,7 @@ pub fn listen(
     // Process each new client connection
     .for_each(move |stream| {
       tokio::spawn(
-        client_handler
+        stream_handler
           .handle(stream)
           .map_err(|error| error!("Connect service (client): {}", error)));
       Ok(())

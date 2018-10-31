@@ -45,7 +45,7 @@ impl ConnectService {
     close_rx: CloseSignal,
   ) -> Result<()> {
     // Maps incoming packets to server responses
-    let mut responder = net::PacketResponder::new(realms);
+    let mut responder = net::ClientPacketResponder::new(realms);
     responder.set_ignore_unknown_packets(config.ignore_unknown_packets());
 
     // Factory for the packet codec
@@ -53,7 +53,7 @@ impl ConnectService {
     let codec_provider = move || net::codec(max_packet_size);
 
     // Manages each client's stream
-    let mut handler = net::StreamHandler::new(responder, codec_provider);
+    let mut handler = net::ClientStreamHandler::new(responder, codec_provider);
     handler.set_max_idle_time(config.max_idle_time());
     handler.set_max_requests(config.max_requests());
     handler.set_max_unresponsive_time(config.max_unresponsive_time());

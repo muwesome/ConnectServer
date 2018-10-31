@@ -69,6 +69,7 @@ pub enum ServerError {
 pub enum ConnectServiceError {
   #[fail(display = "Server error")]
   Server(ServerError),
+
   #[fail(display = "Client error")]
   Client(ClientError),
 }

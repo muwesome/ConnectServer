@@ -1,4 +1,4 @@
-use super::{ClientPacketResponder, ClientStreamHandler};
+use super::{PacketResponder, StreamHandler};
 use super::{ConnectServiceFuture, PacketCodecProvider};
 use crate::service::connect::error::{ClientError, ConnectServiceError, Result};
 use futures::{Future, Sink, Stream};
@@ -8,7 +8,7 @@ use tokio::codec::Decoder;
 use tokio::net::TcpStream;
 use tokio::prelude::{FutureExt, StreamExt};
 
-pub struct StreamHandler<R: ClientPacketResponder, P: PacketCodecProvider> {
+pub struct ClientStreamHandler<R: PacketResponder, P: PacketCodecProvider> {
   codec_provider: P,
   max_idle_time: Duration,
   max_requests: usize,
@@ -16,13 +16,13 @@ pub struct StreamHandler<R: ClientPacketResponder, P: PacketCodecProvider> {
   responder: Arc<R>,
 }
 
-impl<R, P> StreamHandler<R, P>
+impl<R, P> ClientStreamHandler<R, P>
 where
-  R: ClientPacketResponder,
+  R: PacketResponder,
   P: PacketCodecProvider,
 {
   pub fn new(responder: R, codec_provider: P) -> Self {
-    StreamHandler {
+    ClientStreamHandler {
       codec_provider,
       max_idle_time: Duration::from_secs(100),
       max_requests: 20,
@@ -44,9 +44,9 @@ where
   }
 }
 
-impl<R, P> ClientStreamHandler for StreamHandler<R, P>
+impl<R, P> StreamHandler for ClientStreamHandler<R, P>
 where
-  R: ClientPacketResponder,
+  R: PacketResponder,
   P: PacketCodecProvider,
 {
   /// Bootstraps the connection stream.

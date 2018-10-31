@@ -1,4 +1,4 @@
-use super::{ClientStreamHandler, ConnectServiceFuture};
+use super::{StreamHandler, ConnectServiceFuture};
 use crate::service::connect::error::{ClientError, Result, ServerError};
 use crate::state::ClientPool;
 use futures::{future, Future};
@@ -6,12 +6,12 @@ use std::net::{SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::TcpStream;
 
-pub struct ClientSessionDecorator<T: ClientStreamHandler> {
+pub struct ClientSessionDecorator<T: StreamHandler> {
   clients: ClientPool,
   handler: Arc<T>,
 }
 
-impl<T: ClientStreamHandler> ClientSessionDecorator<T> {
+impl<T: StreamHandler> ClientSessionDecorator<T> {
   pub fn new(clients: ClientPool, handler: T) -> Self {
     ClientSessionDecorator {
       handler: Arc::new(handler),
@@ -20,7 +20,7 @@ impl<T: ClientStreamHandler> ClientSessionDecorator<T> {
   }
 }
 
-impl<T: ClientStreamHandler> ClientStreamHandler for ClientSessionDecorator<T> {
+impl<T: StreamHandler> StreamHandler for ClientSessionDecorator<T> {
   /// Bootstraps the connection stream.
   fn handle(&self, stream: TcpStream) -> ConnectServiceFuture<()> {
     let clients = self.clients.clone();

@@ -1,17 +1,17 @@
-use super::ClientPacketResponder;
+use super::PacketResponder;
 use crate::service::connect::error::{ClientError, Result, ServerError};
 use crate::state::RealmBrowser;
 use muonline_packet::{Packet, PacketEncodable};
 use muonline_protocol::connect::{self, server, Client};
 
-pub struct PacketResponder {
+pub struct ClientPacketResponder {
   ignore_unknown_packets: bool,
   realms: RealmBrowser,
 }
 
-impl PacketResponder {
+impl ClientPacketResponder {
   pub fn new(realms: RealmBrowser) -> Self {
-    PacketResponder {
+    ClientPacketResponder {
       realms,
       ignore_unknown_packets: false,
     }
@@ -22,7 +22,7 @@ impl PacketResponder {
   }
 }
 
-impl ClientPacketResponder for PacketResponder {
+impl PacketResponder for ClientPacketResponder {
   /// Constructs a response for a client packet.
   fn respond(&self, packet: &Packet) -> Result<Option<Packet>> {
     match Client::from_packet(&packet).map_err(ClientError::InvalidPacket)? {
