@@ -31,7 +31,6 @@ where
   }
 }
 
-#[derive(Clone)]
 pub struct Dispatcher<T: ?Sized> {
   subscribers: Arc<Mutex<Vec<Weak<T>>>>,
 }
@@ -64,6 +63,14 @@ impl<T: ?Sized> Dispatcher<T> {
       guard: self.subscribers.lock(),
       dispatch: f,
       index: 0,
+    }
+  }
+}
+
+impl<T: ?Sized> Clone for Dispatcher<T> {
+  fn clone(&self) -> Self {
+    Dispatcher {
+      subscribers: self.subscribers.clone(),
     }
   }
 }

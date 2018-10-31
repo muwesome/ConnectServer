@@ -1,8 +1,6 @@
 use chashmap::CHashMap;
-use crate::util::Dispatcher;
+use crate::util::{Dispatcher, IndexPool};
 use failure::Fail;
-use index_pool::IndexPool;
-use parking_lot::Mutex;
 use std::cell::Cell;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::{fmt, sync::Arc};
@@ -44,66 +42,60 @@ pub enum ClientPoolError {
   MaxCapacityForIp(Ipv4Addr),
 }
 
-struct ClientPoolInner {
-  dispatcher: Dispatcher<ClientListener>,
-  pool: IndexPool,
-}
-
 #[derive(Clone)]
 pub struct ClientPool {
-  inner: Arc<Mutex<ClientPoolInner>>,
-  map: Arc<CHashMap<ClientId, Client>>,
-  capacity: usize,
+  dispatcher: Dispatcher<ClientListener>,
+  clients: Arc<CHashMap<ClientId, Client>>,
+  pool: Arc<IndexPool>,
   capacity_per_ip: usize,
 }
 
 impl ClientPool {
   pub fn new(capacity: usize, capacity_per_ip: usize) -> Self {
-    let inner = Arc::new(Mutex::new(ClientPoolInner {
-      pool: IndexPool::new(),
-      dispatcher: Dispatcher::new(),
-    }));
     ClientPool {
-      map: Arc::new(CHashMap::new()),
-      inner,
-      capacity,
+      dispatcher: Dispatcher::new(),
+      clients: Arc::new(CHashMap::new()),
+      pool: Arc::new(IndexPool::with_capacity(capacity)),
       capacity_per_ip,
     }
   }
 
   pub fn subscribe(&self, listener: &Arc<ClientListener>) {
-    let inner = self.inner.lock();
-    inner.dispatcher.subscribe(listener);
+    self.dispatcher.subscribe(listener);
   }
 
   pub fn add(&self, socket: SocketAddrV4) -> Result<ClientHandle, ClientPoolError> {
-    // TODO: Should these conditions be checked externally?
-    if self.map.len() >= self.capacity {
-      Err(ClientPoolError::MaxCapacity)?;
-    }
-
+    // TODO: Should this condition be checked externally?
     if self.num_of_clients_for_ip(*socket.ip()) > self.capacity_per_ip - 1 {
       Err(ClientPoolError::MaxCapacityForIp(*socket.ip()))?;
     }
 
-    let mut inner = self.inner.lock();
-    let client_id = inner.pool.new_id();
+    let client_id = self.pool.new_id().ok_or(ClientPoolError::MaxCapacity)?;
     let client = Client::new(client_id, socket);
 
-    inner.dispatcher.dispatch(|l| l.on_connect(&client));
-    self.map.insert_new(client_id, client);
+    self.dispatcher.dispatch(|l| l.on_connect(&client));
+    self.clients.insert_new(client_id, client);
 
     Ok(ClientHandle {
-      inner: self.inner.clone(),
-      map: self.map.clone(),
+      pool: self.clone(),
       id: client_id,
     })
+  }
+
+  fn remove(&self, id: ClientId) -> Result<(), ClientPoolError> {
+    self
+      .clients
+      .remove(&id)
+      .map(|client| self.dispatcher.dispatch(|l| l.on_disconnect(&client)))
+      .ok_or(ClientPoolError::InexistentId)?;
+    self.pool.return_id(id);
+    Ok(())
   }
 
   /// Returns the number of clients for an IP address.
   fn num_of_clients_for_ip(&self, ip: Ipv4Addr) -> usize {
     let ip_clients = Cell::new(0);
-    self.map.retain(|_, client| {
+    self.clients.retain(|_, client| {
       if *client.socket.ip() == ip {
         ip_clients.set(ip_clients.get() + 1);
       }
@@ -114,21 +106,12 @@ impl ClientPool {
 }
 
 pub struct ClientHandle {
-  inner: Arc<Mutex<ClientPoolInner>>,
-  map: Arc<CHashMap<ClientId, Client>>,
+  pool: ClientPool,
   id: ClientId,
 }
 
 impl Drop for ClientHandle {
   fn drop(&mut self) {
-    let mut inner = self.inner.lock();
-
-    inner.pool.return_id(self.id).expect("Invalid pool state");
-    self
-      .map
-      .get(&self.id)
-      .map(|client| inner.dispatcher.dispatch(|l| l.on_disconnect(&client)))
-      .expect("Invalid pool state");
-    self.map.remove(&self.id);
+    self.pool.remove(self.id).expect("Invalid pool state");
   }
 }

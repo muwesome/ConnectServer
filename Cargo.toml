@@ -20,7 +20,6 @@ failure = "0.1"
 futures = "0.1"
 grpcio = { version = "0.4", default-features = false, features = ["protobuf-codec"] }
 humantime = "1.1"
-index-pool = "1.0"
 muonline-packet = { path = "../Packet", features = ["codec"] }
 muonline-protocol = { path = "../Protocol" }
 parking_lot = "0.6"
@@ -33,6 +32,7 @@ log = "0.4"
 pretty_env_logger = { version = "0.2", optional = true }
 auto_impl = "0.3.0"
 chashmap = "2.2.0"
+crossbeam = "0.4.1"
 
 [features]
 build-binary = ["ctrlc", "structopt", "pretty_env_logger"]
