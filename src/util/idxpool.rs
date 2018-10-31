@@ -17,17 +17,16 @@ impl IndexPool {
   }
 
   pub fn new_id(&self) -> Option<usize> {
-    match self.previous_values.try_pop() {
-      Some(id) => Some(id),
-      None => {
-        let id = self.current_value.fetch_add(1, Ordering::SeqCst);
-        if id == self.max_value {
-          self.current_value.fetch_sub(1, Ordering::SeqCst);
-          None
-        } else {
-          Some(id + 1)
-        }
-      }
+    if let Some(id) = self.previous_values.try_pop() {
+      return Some(id);
+    }
+
+    let id = self.current_value.fetch_add(1, Ordering::SeqCst);
+    if id == self.max_value {
+      self.current_value.fetch_sub(1, Ordering::SeqCst);
+      None
+    } else {
+      Some(id)
     }
   }
 
