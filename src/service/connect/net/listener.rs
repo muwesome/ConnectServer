@@ -47,7 +47,7 @@ impl ClientListener {
       close_signal.map_err(|_| ConnectServiceError::from(ServerError::CloseSignalAborted));
 
     // Listen on the supplied TCP socket
-    let listener = TcpListener::bind(&socket.into()).map_err(ServerError::Bind)?;
+    let listener = TcpListener::bind(&socket).map_err(ServerError::Bind)?;
     let local_addr = listener
       .local_addr()
       .map_err(ServerError::CannotResolveAddress)?;

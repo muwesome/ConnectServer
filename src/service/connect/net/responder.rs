@@ -1,6 +1,7 @@
 use super::PacketResponder;
 use crate::service::connect::error::{ClientError, Result, ServerError};
 use crate::state::RealmBrowser;
+use log::warn;
 use muonline_packet::{Packet, PacketEncodable};
 use muonline_protocol::connect::{self, server, Client};
 
@@ -65,19 +66,19 @@ impl PacketResponder for ClientPacketResponder {
           .map_err(From::from)
       }
       _ => {
+        // Preserve enough bytes to construct a footprint
+        let header = [packet.kind() as u8, packet.code()]
+          .iter()
+          .chain(packet.data().iter().take(2))
+          .cloned()
+          .collect::<Vec<_>>();
+        let error = ClientError::UnknownPacket { header };
+
         if self.ignore_unknown_packets {
+          warn!("{}", error);
           Ok(None)
         } else {
-          Err(
-            ClientError::UnknownPacket {
-              // Preserve enough bytes to construct a footprint
-              header: [packet.kind() as u8, packet.code()]
-                .iter()
-                .chain(packet.data().iter().take(2))
-                .cloned()
-                .collect::<Vec<_>>(),
-            }.into(),
-          )
+          Err(error.into())
         }
       }
     }
