@@ -13,13 +13,13 @@ mod proto;
 
 #[derive(Fail, Debug)]
 enum RpcServiceError {
-  #[fail(display = "Failed to build service: {}", _0)]
+  #[fail(display = "Failed to build service")]
   BuildFailure(#[cause] grpcio::Error),
 
-  #[fail(display = "Failed to shutdown service: {}", _0)]
+  #[fail(display = "Failed to shutdown service")]
   ShutdownFailure(#[cause] grpcio::Error),
 
-  #[fail(display = "Close signal was aborted prematurely")]
+  #[fail(display = "Close signal aborted")]
   CloseSignalAborted,
 }
 

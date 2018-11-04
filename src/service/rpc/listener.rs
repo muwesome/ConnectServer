@@ -9,8 +9,8 @@ use try_from::TryFrom;
 
 /// Shorthand macro for creating an RPC error status.
 macro_rules! rpcerr {
-  ($e:ident, $msg:expr) => {
-    RpcStatus::new(RpcStatusCode::$e, Some($msg.into()))
+  ($e:ident, $($arg:tt)*) => {
+    RpcStatus::new(RpcStatusCode::$e, Some(format!($($arg)*)))
   };
 }
 
@@ -35,7 +35,7 @@ impl proto::RealmService for RpcListener {
   ) {
     let realm_stream = stream
       // Apply context for any potential errors
-      .map_err(|error| rpcerr!(Aborted, format!("Stream closed: {}", error)))
+      .map_err(|error| rpcerr!(Aborted, "Stream closed: {}", error))
       // Require the realm field to be specified
       .and_then(|input| input.kind.ok_or_else(|| {
         rpcerr!(InvalidArgument, "Kind not specified")
@@ -51,7 +51,7 @@ impl proto::RealmService for RpcListener {
           .ok_or_else(|| rpcerr!(InvalidArgument, "Expected realm definition"))?;
 
         let realm = RealmServer::try_from(definition)
-          .map_err(|error| rpcerr!(InvalidArgument, format!("Realm insert failed: {}", error)))?;
+          .map_err(|error| rpcerr!(InvalidArgument, "Realm insert failed: {}", error))?;
         Ok((realm, stream))
       });
 
@@ -72,11 +72,11 @@ impl proto::RealmService for RpcListener {
           realms.update(realm_id, |realm| {
             realm.clients = status.get_clients() as usize;
             realm.capacity = status.get_capacity() as usize;
-          }).map_err(|error| rpcerr!(Internal, format!("Realm update failed: {}", error)))
+          }).map_err(|error| rpcerr!(Internal, "Realm update failed: {}", error))
         })).then(move |result| result.and(
           realms
             .remove(realm_id)
-            .map_err(|error| rpcerr!(Internal, format!("Realm removal failed: {}", error)))
+            .map_err(|error| rpcerr!(Internal, "Realm removal failed: {}", error))
         ))
       }).then(|result| result.tap_err(|error| error!("RPC client: {:?}", error)));
 

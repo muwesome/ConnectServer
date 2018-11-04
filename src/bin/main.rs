@@ -30,7 +30,7 @@ fn run() -> Result<(), Error> {
     thread::sleep(Duration::from_millis(100));
   }
 
-  server.stop().context("Error during shutdown")?;
+  server.stop().context("Error during execution")?;
   Ok(())
 }
 
