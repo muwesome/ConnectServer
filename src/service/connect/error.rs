@@ -1,4 +1,4 @@
-use crate::state::{ClientPoolError, RealmBrowserError};
+use crate::state::RealmBrowserError;
 use failure::Fail;
 use muonline_protocol::connect::Version;
 use std::io;
@@ -35,19 +35,16 @@ pub enum ClientError {
   VersionMismatch { has: Version, expected: Version },
 }
 
-impl ClientError {
-  pub fn connection_reset_by_peer(&self) -> bool {
-    matches!(self, ClientError::Connection(error) if error.kind() == io::ErrorKind::ConnectionReset)
-  }
-}
-
 #[derive(Fail, Debug)]
 pub enum ServerError {
+  #[fail(display = "Abort triggered during startup")]
+  Abort,
+
   #[fail(display = "Failed to resolve address")]
   CannotResolveAddress(#[fail(cause)] io::Error),
 
-  #[fail(display = "Client state error")]
-  ClientState(#[fail(cause)] ClientPoolError),
+  #[fail(display = "Client rejected by server")]
+  ClientRejected,
 
   #[fail(display = "Close signal aborted")]
   CloseSignalAborted,
@@ -68,10 +65,10 @@ pub enum ServerError {
 #[derive(Fail, Debug)]
 pub enum ConnectServiceError {
   #[fail(display = "Server error")]
-  Server(ServerError),
+  Server(#[fail(cause)] ServerError),
 
   #[fail(display = "Client error")]
-  Client(ClientError),
+  Client(#[fail(cause)] ClientError),
 }
 
 impl ConnectServiceError {
@@ -81,6 +78,19 @@ impl ConnectServiceError {
       .map(ClientError::Connection)
       .unwrap_or_else(|| ClientError::TimedOut)
       .into()
+  }
+
+  pub fn connection_reset_by_peer(&self) -> bool {
+    matches!(self,
+      ConnectServiceError::Client(ClientError::Connection(error))
+        if error.kind() == io::ErrorKind::ConnectionReset)
+  }
+
+  pub fn reject_by_server(&self) -> bool {
+    matches!(
+      self,
+      ConnectServiceError::Server(ServerError::ClientRejected)
+    )
   }
 }
 

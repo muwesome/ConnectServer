@@ -1,6 +1,5 @@
-use crate::observer::EventObserver;
-use crate::service::{ConnectService, ConnectServiceConfig, RpcService};
-use crate::state::{ClientPool, RealmBrowser};
+use crate::service::{ConnectService, RpcService};
+use crate::state::RealmBrowser;
 use failure::ResultExt;
 use std::sync::Arc;
 
@@ -9,24 +8,20 @@ pub use crate::config::ConnectConfig;
 #[macro_use]
 mod util;
 mod config;
-mod observer;
 mod service;
 mod state;
 
-// TODO: Send client IP + port with span to realm server?
+// TODO: Mixing IpV4/6?
 // TODO: Fix local packet dependencies
 // TODO: Parse arguments from TOML as well
 // TODO: Disable connect service if RPC fails & vice versa?
 // TODO: Refactor RPC listener
-// TODO: Improved listener/oberver?
 
 /// Default result type used.
 type Result<T> = std::result::Result<T, failure::Error>;
 
 /// The server object.
 pub struct ConnectServer {
-  #[allow(dead_code)]
-  observer: Arc<EventObserver>,
   connect_service: ConnectService,
   rpc_service: RpcService,
 }
@@ -35,18 +30,12 @@ impl ConnectServer {
   /// Spawns a new Connect Server using defaults.
   pub fn spawn(config: ConnectConfig) -> Result<Self> {
     let realms = RealmBrowser::new();
-    let clients = ClientPool::new(config.max_connections(), config.max_connections_per_ip());
     let config = Arc::new(config);
 
-    let observer = Arc::new(EventObserver);
-    realms.subscribe(&(observer.clone() as Arc<state::RealmListener>));
-    clients.subscribe(&(observer.clone() as Arc<state::ClientListener>));
-
-    let connect_service = ConnectService::spawn(config.clone(), clients, realms.clone());
+    let connect_service = ConnectService::spawn(config.clone(), realms.clone());
     let rpc_service = RpcService::spawn(config, realms);
 
     Ok(ConnectServer {
-      observer,
       rpc_service,
       connect_service,
     })

@@ -5,14 +5,12 @@ use muonline_packet::{Packet, PacketCodec, PacketCodecState, XOR_CIPHER};
 use tokio::net::TcpStream;
 
 pub use self::handler::ClientStreamHandler;
-pub use self::listener::listen;
+pub use self::listener::ClientListener;
 pub use self::responder::ClientPacketResponder;
-pub use self::session::ClientSessionDecorator;
 
 mod handler;
 mod listener;
 mod responder;
-mod session;
 
 /// Represents a boxed connect service future.
 type ConnectServiceFuture<T> = Box<Future<Item = T, Error = ConnectServiceError> + Send + 'static>;

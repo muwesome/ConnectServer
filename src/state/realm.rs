@@ -1,5 +1,4 @@
 use chashmap::CHashMap;
-use crate::util::Dispatcher;
 use failure::Fail;
 use std::{cell::RefCell, ops::DerefMut};
 use std::{fmt, sync::Arc};
@@ -33,12 +32,6 @@ impl fmt::Display for RealmServer {
   }
 }
 
-pub trait RealmListener: Send + Sync {
-  fn on_register(&self, _realm: &RealmServer) {}
-  fn on_deregister(&self, _realm: &RealmServer) {}
-  fn on_update(&self, _realm: &RealmServer) {}
-}
-
 #[derive(Fail, Debug)]
 pub enum RealmBrowserError {
   #[fail(display = "Non-unique realm ID")]
@@ -50,20 +43,14 @@ pub enum RealmBrowserError {
 
 #[derive(Clone)]
 pub struct RealmBrowser {
-  dispatcher: Dispatcher<RealmListener>,
   realms: Arc<CHashMap<RealmServerId, RealmServer>>,
 }
 
 impl RealmBrowser {
   pub fn new() -> Self {
     RealmBrowser {
-      dispatcher: Dispatcher::new(),
       realms: Arc::new(CHashMap::new()),
     }
-  }
-
-  pub fn subscribe(&self, listener: &Arc<RealmListener>) {
-    self.dispatcher.subscribe(listener);
   }
 
   pub fn add(&self, realm: RealmServer) -> Result<(), RealmBrowserError> {
@@ -71,7 +58,6 @@ impl RealmBrowser {
       Err(RealmBrowserError::DuplicateId)?;
     }
 
-    self.dispatcher.dispatch(|l| l.on_register(&realm));
     self.realms.insert_new(realm.id, realm);
     Ok(())
   }
@@ -80,7 +66,6 @@ impl RealmBrowser {
     self
       .realms
       .remove(&id)
-      .map(|realm| self.dispatcher.dispatch(|l| l.on_deregister(&realm)))
       .ok_or(RealmBrowserError::InexistentId)?;
     Ok(())
   }
@@ -92,10 +77,8 @@ impl RealmBrowser {
     self
       .realms
       .get_mut(&id)
-      .map(|mut realm| {
-        mutator(&mut realm);
-        self.dispatcher.dispatch(|l| l.on_update(&realm));
-      }).ok_or(RealmBrowserError::InexistentId)
+      .map(|mut realm| mutator(&mut realm))
+      .ok_or(RealmBrowserError::InexistentId)
   }
 
   pub fn for_each<F: FnMut(&RealmServer)>(&self, func: F) {

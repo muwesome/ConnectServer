@@ -33,6 +33,7 @@ pretty_env_logger = { version = "0.2", optional = true }
 auto_impl = "0.3.0"
 chashmap = "2.2.0"
 crossbeam = "0.4.1"
+boolinator = "2.4.0"
 
 [features]
 build-binary = ["ctrlc", "structopt", "pretty_env_logger"]

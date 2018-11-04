@@ -1,25 +1,21 @@
 pub use self::config::ConnectServiceConfig;
 pub use self::error::ConnectServiceError;
-use crate::state::{ClientPool, RealmBrowser};
 use crate::util::{CloseSignal, ThreadController};
-use crate::Result;
+use crate::{state::RealmBrowser, Result};
 use std::sync::Arc;
 
 mod config;
 mod error;
 mod net;
+mod plugin;
 
 /// A connect service instance.
 pub struct ConnectService(ThreadController);
 
 impl ConnectService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(
-    config: Arc<impl ConnectServiceConfig>,
-    clients: ClientPool,
-    realms: RealmBrowser,
-  ) -> Self {
-    let ctl = ThreadController::spawn(move |rx| Self::serve(&*config, clients, realms, rx));
+  pub fn spawn(config: Arc<impl ConnectServiceConfig>, realms: RealmBrowser) -> Self {
+    let ctl = ThreadController::spawn(move |rx| Self::serve(&*config, realms, rx));
     ConnectService(ctl)
   }
 
@@ -40,7 +36,6 @@ impl ConnectService {
 
   fn serve(
     config: &impl ConnectServiceConfig,
-    clients: ClientPool,
     realms: RealmBrowser,
     close_rx: CloseSignal,
   ) -> Result<()> {
@@ -53,15 +48,19 @@ impl ConnectService {
     let codec_provider = move || net::codec(max_packet_size);
 
     // Manages each client's stream
-    let mut handler = net::ClientStreamHandler::new(responder, codec_provider);
-    handler.set_max_idle_time(config.max_idle_time());
-    handler.set_max_requests(config.max_requests());
-    handler.set_max_unresponsive_time(config.max_unresponsive_time());
-
-    // Wraps each client's stream with a session
-    let client_handler = net::ClientSessionDecorator::new(clients, handler);
+    let mut client_handler = net::ClientStreamHandler::new(responder, codec_provider);
+    client_handler.set_max_idle_time(config.max_idle_time());
+    client_handler.set_max_requests(config.max_requests());
+    client_handler.set_max_unresponsive_time(config.max_unresponsive_time());
+    client_handler.register_plugin(plugin::ClientEventLogger);
+    client_handler.register_plugin(plugin::CheckMaximumClients::new(config.max_connections()));
+    client_handler.register_plugin(plugin::CheckMaximumClientsPerIp::new(
+      config.max_connections_per_ip(),
+    ));
 
     // Listen for incoming client connections
-    net::listen(config.socket(), client_handler, close_rx).map_err(From::from)
+    let listener = net::ClientListener::new(config.socket(), close_rx);
+    listener.register_plugin(plugin::ListenerEventLogger);
+    listener.listen(client_handler).map_err(From::from)
   }
 }
