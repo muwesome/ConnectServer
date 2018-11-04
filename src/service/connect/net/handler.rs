@@ -5,15 +5,15 @@ use crate::service::connect::error::*;
 use crate::service::connect::plugin::ClientEventPlugin;
 use crate::util::EventHandler;
 use futures::{future, Future, IntoFuture, Sink, Stream};
-use std::net::{SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 use std::{sync::Arc, time::Duration};
 use tokio::codec::Decoder;
 use tokio::net::TcpStream;
 use tokio::prelude::{FutureExt, StreamExt};
 
 pub struct ClientStreamHandler<R: PacketResponder, P: PacketCodecProvider> {
-  on_connect: EventHandler<SocketAddrV4>,
-  on_disconnect: EventHandler<SocketAddrV4>,
+  on_connect: EventHandler<SocketAddr>,
+  on_disconnect: EventHandler<SocketAddr>,
   on_error: EventHandler<ConnectServiceError>,
   codec_provider: P,
   max_idle_time: Duration,
@@ -73,7 +73,12 @@ where
 {
   /// Bootstraps the connection stream.
   fn handle(&self, stream: TcpStream) -> ConnectServiceFuture<()> {
-    let peer_addr = future::result(peer_addr_v4(&stream));
+    let peer_addr = future::result(
+      stream
+        .peer_addr()
+        .map_err(ClientError::CannotResolveAddress)
+        .map_err(ConnectServiceError::from),
+    );
 
     let (writer, reader) = self.codec_provider.create()
       // Use a non C3/C4 encrypted TCP codec
@@ -136,14 +141,4 @@ fn packet_limiter<P>(limit: usize) -> impl FnMut(P) -> Result<P> {
       Ok(packet)
     }
   }
-}
-
-/// Returns a peer's socket address.
-fn peer_addr_v4(stream: &TcpStream) -> Result<SocketAddrV4> {
-  let socket = stream
-    .peer_addr()
-    .map_err(ClientError::CannotResolveAddress)?;
-  matches_opt!(socket, SocketAddr::V4(addr) => addr)
-    .ok_or(ClientError::InvalidIpVersion)
-    .map_err(From::from)
 }

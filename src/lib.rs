@@ -11,7 +11,6 @@ mod config;
 mod service;
 mod state;
 
-// TODO: Mixing IpV4/6?
 // TODO: Fix local packet dependencies
 // TODO: Parse arguments from TOML as well
 // TODO: Disable connect service if RPC fails & vice versa?

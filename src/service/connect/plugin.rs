@@ -3,7 +3,7 @@ use chashmap::CHashMap;
 use crate::util::EventArgs;
 use failure::Fail;
 use log::{error, info, warn};
-use std::net::{SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A trait describing a listener event plugin.
@@ -15,9 +15,9 @@ pub trait ListenerEventPlugin: Send + Sync + 'static {
 
 /// A trait describing a client event plugin.
 pub trait ClientEventPlugin: Send + Sync + 'static {
-  fn on_connect(&self, _event: &mut EventArgs<SocketAddrV4>) {}
+  fn on_connect(&self, _event: &mut EventArgs<SocketAddr>) {}
 
-  fn on_disconnect(&self, _event: &mut EventArgs<SocketAddrV4>) {}
+  fn on_disconnect(&self, _event: &mut EventArgs<SocketAddr>) {}
 
   fn on_error(&self, _event: &mut EventArgs<ConnectServiceError>) {}
 }
@@ -42,11 +42,11 @@ impl ListenerEventPlugin for ListenerEventLogger {
 pub struct ClientEventLogger;
 
 impl ClientEventPlugin for ClientEventLogger {
-  fn on_connect(&self, event: &mut EventArgs<SocketAddrV4>) {
+  fn on_connect(&self, event: &mut EventArgs<SocketAddr>) {
     info!("Client connected: {}", **event);
   }
 
-  fn on_disconnect(&self, event: &mut EventArgs<SocketAddrV4>) {
+  fn on_disconnect(&self, event: &mut EventArgs<SocketAddr>) {
     info!("Client disconnected: {}", **event);
   }
 
@@ -62,7 +62,7 @@ impl ClientEventPlugin for ClientEventLogger {
 
 /// Plugin restricting maximum clients per IP.
 pub struct CheckMaximumClientsPerIp {
-  clients: CHashMap<SocketAddrV4, usize>,
+  clients: CHashMap<SocketAddr, usize>,
   capacity_per_ip: usize,
 }
 
@@ -76,7 +76,7 @@ impl CheckMaximumClientsPerIp {
 }
 
 impl ClientEventPlugin for CheckMaximumClientsPerIp {
-  fn on_connect(&self, event: &mut EventArgs<SocketAddrV4>) {
+  fn on_connect(&self, event: &mut EventArgs<SocketAddr>) {
     let socket = **event;
     let mut is_capacity_reached_for_ip = false;
 
@@ -98,7 +98,7 @@ impl ClientEventPlugin for CheckMaximumClientsPerIp {
     }
   }
 
-  fn on_disconnect(&self, event: &mut EventArgs<SocketAddrV4>) {
+  fn on_disconnect(&self, event: &mut EventArgs<SocketAddr>) {
     *self.clients.get_mut(&*event).expect("Invalid client state") -= 1;
   }
 }
@@ -119,7 +119,7 @@ impl CheckMaximumClients {
 }
 
 impl ClientEventPlugin for CheckMaximumClients {
-  fn on_connect(&self, event: &mut EventArgs<SocketAddrV4>) {
+  fn on_connect(&self, event: &mut EventArgs<SocketAddr>) {
     if self.clients.fetch_add(1, Ordering::SeqCst) == self.capacity {
       warn!(
         "Client refused from {}; client capacity reached ({})",
@@ -129,7 +129,7 @@ impl ClientEventPlugin for CheckMaximumClients {
     }
   }
 
-  fn on_disconnect(&self, _event: &mut EventArgs<SocketAddrV4>) {
+  fn on_disconnect(&self, _event: &mut EventArgs<SocketAddr>) {
     self.clients.fetch_sub(1, Ordering::SeqCst);
   }
 }

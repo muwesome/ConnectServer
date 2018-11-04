@@ -15,9 +15,6 @@ pub enum ClientError {
   #[fail(display = "Invalid packet received")]
   InvalidPacket(#[fail(cause)] io::Error),
 
-  #[fail(display = "Invalid IP version")]
-  InvalidIpVersion,
-
   #[fail(display = "Maximum packet count exceeded")]
   MaxPacketsExceeded,
 

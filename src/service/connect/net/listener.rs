@@ -3,19 +3,19 @@ use crate::service::connect::error::{ConnectServiceError, Result, ServerError};
 use crate::service::connect::plugin::ListenerEventPlugin;
 use crate::util::{CloseSignal, EventHandler};
 use futures::{Future, Stream};
-use std::net::{SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{self, net::TcpListener};
 
 pub struct ClientListener {
   on_startup: EventHandler<SocketAddr>,
   on_error: EventHandler<ConnectServiceError>,
-  socket: SocketAddrV4,
+  socket: SocketAddr,
   close_signal: CloseSignal,
 }
 
 impl ClientListener {
-  pub fn new(socket: SocketAddrV4, close_signal: CloseSignal) -> Self {
+  pub fn new(socket: SocketAddr, close_signal: CloseSignal) -> Self {
     ClientListener {
       on_startup: EventHandler::new(),
       on_error: EventHandler::new(),

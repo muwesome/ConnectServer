@@ -1,5 +1,5 @@
 use crate::service::{ConnectServiceConfig, RpcServiceConfig};
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 
 #[cfg(feature = "build-binary")]
@@ -17,11 +17,11 @@ pub struct ConnectConfig {
     structopt(
       short = "h",
       long = "host",
-      help = "Bind to this IPv4 client address",
+      help = "Bind to this IP client address",
       default_value = "0.0.0.0"
     )
   )]
-  pub host: Ipv4Addr,
+  pub host: IpAddr,
 
   #[cfg_attr(
     feature = "build-binary",
@@ -127,13 +127,13 @@ pub struct ConnectConfig {
 }
 
 impl ConnectConfig {
-  pub fn socket(&self) -> SocketAddrV4 {
-    SocketAddrV4::new(self.host, self.port)
+  pub fn socket(&self) -> SocketAddr {
+    SocketAddr::new(self.host, self.port)
   }
 }
 
 impl ConnectServiceConfig for ConnectConfig {
-  fn host(&self) -> Ipv4Addr {
+  fn host(&self) -> IpAddr {
     self.host
   }
 

@@ -1,8 +1,8 @@
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 
 pub trait ConnectServiceConfig: Send + Sync + 'static {
-  fn host(&self) -> Ipv4Addr;
+  fn host(&self) -> IpAddr;
 
   fn port(&self) -> u16;
 
@@ -20,7 +20,7 @@ pub trait ConnectServiceConfig: Send + Sync + 'static {
 
   fn ignore_unknown_packets(&self) -> bool;
 
-  fn socket(&self) -> SocketAddrV4 {
-    SocketAddrV4::new(self.host(), self.port())
+  fn socket(&self) -> SocketAddr {
+    SocketAddr::new(self.host(), self.port())
   }
 }
