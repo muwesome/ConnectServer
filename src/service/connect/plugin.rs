@@ -9,16 +9,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// A trait describing a listener event plugin.
 pub trait ListenerEventPlugin: Send + Sync + 'static {
   fn on_startup(&self, _event: &mut EventArgs<SocketAddr>) {}
-
   fn on_error(&self, _event: &mut EventArgs<ConnectServiceError>) {}
 }
 
 /// A trait describing a client event plugin.
 pub trait ClientEventPlugin: Send + Sync + 'static {
   fn on_connect(&self, _event: &mut EventArgs<SocketAddr>) {}
-
   fn on_disconnect(&self, _event: &mut EventArgs<SocketAddr>) {}
-
   fn on_error(&self, _event: &mut EventArgs<ConnectServiceError>) {}
 }
 
@@ -27,12 +24,12 @@ pub struct ListenerEventLogger;
 
 impl ListenerEventPlugin for ListenerEventLogger {
   fn on_startup(&self, event: &mut EventArgs<SocketAddr>) {
-    info!("Connect service listening on {}", **event);
+    info!("Connect service listening on {}", event.data());
   }
 
   fn on_error(&self, event: &mut EventArgs<ConnectServiceError>) {
-    error!("Client listener — {}", **event);
-    for cause in ((&**event) as &Fail).iter_causes() {
+    error!("Client listener — {}", event.data());
+    for cause in (event.data() as &Fail).iter_causes() {
       error!("— {}", cause);
     }
   }
@@ -43,17 +40,18 @@ pub struct ClientEventLogger;
 
 impl ClientEventPlugin for ClientEventLogger {
   fn on_connect(&self, event: &mut EventArgs<SocketAddr>) {
-    info!("Client connected: {}", **event);
+    info!("Client connected: {}", event.data());
   }
 
   fn on_disconnect(&self, event: &mut EventArgs<SocketAddr>) {
-    info!("Client disconnected: {}", **event);
+    info!("Client disconnected: {}", event.data());
   }
 
   fn on_error(&self, event: &mut EventArgs<ConnectServiceError>) {
-    if !event.connection_reset_by_peer() && !event.reject_by_server() {
-      warn!("Client session — {}", **event);
-      for cause in ((&**event) as &Fail).iter_causes() {
+    let error = event.data();
+    if !error.connection_reset_by_peer() && !error.reject_by_server() {
+      warn!("Client session — {}", error);
+      for cause in (error as &Fail).iter_causes() {
         warn!("— {}", cause);
       }
     }
@@ -77,7 +75,7 @@ impl CheckMaximumClientsPerIp {
 
 impl ClientEventPlugin for CheckMaximumClientsPerIp {
   fn on_connect(&self, event: &mut EventArgs<SocketAddr>) {
-    let socket = **event;
+    let socket = *event.data();
     let mut is_capacity_reached_for_ip = false;
 
     self.clients.upsert(
@@ -99,7 +97,10 @@ impl ClientEventPlugin for CheckMaximumClientsPerIp {
   }
 
   fn on_disconnect(&self, event: &mut EventArgs<SocketAddr>) {
-    *self.clients.get_mut(&*event).expect("Invalid client state") -= 1;
+    *self
+      .clients
+      .get_mut(event.data())
+      .expect("Invalid client state") -= 1;
   }
 }
 
@@ -123,7 +124,8 @@ impl ClientEventPlugin for CheckMaximumClients {
     if self.clients.fetch_add(1, Ordering::SeqCst) == self.capacity {
       warn!(
         "Client refused from {}; client capacity reached ({})",
-        **event, self.capacity
+        event.data(),
+        self.capacity
       );
       event.prevent_default();
     }

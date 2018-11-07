@@ -1,43 +1,91 @@
 use parking_lot::Mutex;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
-pub struct EventArgs<T> {
+pub trait EventArgs<T> {
+  fn is_propagation_stopped(&self) -> bool;
+
+  fn is_default_prevented(&self) -> bool;
+
+  fn stop_propagation(&mut self);
+
+  fn prevent_default(&mut self);
+
+  fn data(&self) -> &T;
+}
+
+struct EventArgsOwned<T> {
   stop_propagation: bool,
   prevent_default: bool,
   value: T,
 }
 
-impl<T> EventArgs<T> {
+impl<T> EventArgsOwned<T> {
   fn new(value: T) -> Self {
-    EventArgs {
+    EventArgsOwned {
       stop_propagation: false,
       prevent_default: false,
       value,
     }
   }
+}
 
-  pub fn is_propagation_stopped(&self) -> bool {
+impl<T> EventArgs<T> for EventArgsOwned<T> {
+  fn is_propagation_stopped(&self) -> bool {
     self.stop_propagation
   }
 
-  pub fn is_default_prevented(&self) -> bool {
+  fn is_default_prevented(&self) -> bool {
     self.prevent_default
   }
 
-  /*pub fn stop_propagation(&mut self) {
+  fn stop_propagation(&mut self) {
     self.stop_propagation = true;
-  }*/
+  }
 
-  pub fn prevent_default(&mut self) {
+  fn prevent_default(&mut self) {
     self.prevent_default = true;
+  }
+
+  fn data(&self) -> &T {
+    &self.value
   }
 }
 
-impl<T> Deref for EventArgs<T> {
-  type Target = T;
+struct EventArgsRef<'a, T: 'static> {
+  stop_propagation: bool,
+  prevent_default: bool,
+  value: &'a T,
+}
 
-  fn deref(&self) -> &Self::Target {
-    &self.value
+impl<'a, T> EventArgsRef<'a, T> {
+  fn new(value: &'a T) -> Self {
+    EventArgsRef {
+      stop_propagation: false,
+      prevent_default: false,
+      value,
+    }
+  }
+}
+
+impl<'a, T> EventArgs<T> for EventArgsRef<'a, T> {
+  fn is_propagation_stopped(&self) -> bool {
+    self.stop_propagation
+  }
+
+  fn is_default_prevented(&self) -> bool {
+    self.prevent_default
+  }
+
+  fn stop_propagation(&mut self) {
+    self.stop_propagation = true;
+  }
+
+  fn prevent_default(&mut self) {
+    self.prevent_default = true;
+  }
+
+  fn data(&self) -> &T {
+    self.value
   }
 }
 
@@ -86,16 +134,12 @@ impl<T: 'static> EventHandler<T> {
     }
   }
 
+  pub fn dispatch_ref(&self, data: &T) -> bool {
+    self.dispatch_impl(EventArgsRef::new(data))
+  }
+
   pub fn dispatch(&self, data: T) -> bool {
-    let mut event = EventArgs::new(data);
-    self.listeners.lock().retain(|listener| {
-      if !event.is_propagation_stopped() {
-        listener.call(&mut event) == EventAction::Keep
-      } else {
-        true
-      }
-    });
-    !event.is_default_prevented()
+    self.dispatch_impl(EventArgsOwned::new(data))
   }
 
   pub fn subscribe<E: EventListener<T>>(&self, listener: E) {
@@ -108,5 +152,16 @@ impl<T: 'static> EventHandler<T> {
     R: Into<EventAction>,
   {
     self.subscribe(closure);
+  }
+
+  fn dispatch_impl(&self, mut event: impl EventArgs<T>) -> bool {
+    self.listeners.lock().retain(|listener| {
+      if !event.is_propagation_stopped() {
+        listener.call(&mut event) == EventAction::Keep
+      } else {
+        true
+      }
+    });
+    !event.is_default_prevented()
   }
 }

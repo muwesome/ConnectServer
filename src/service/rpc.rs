@@ -8,6 +8,7 @@ use log::info;
 use std::sync::Arc;
 
 mod config;
+mod plugin;
 mod proto;
 mod realm;
 
@@ -49,7 +50,9 @@ impl RpcService {
     realms: RealmServerList,
     close_rx: CloseSignal,
   ) -> Result<()> {
-    let service = proto::create_realm_service(realm::RealmRpc::new(realms, close_rx.clone()));
+    let realm_service = realm::RealmRpc::new(realms, close_rx.clone());
+    realm_service.register_plugin(plugin::RealmEventLogger);
+    let service = proto::create_realm_service(realm_service);
 
     let environment = Arc::new(Environment::new(1));
     let mut server = ServerBuilder::new(environment)

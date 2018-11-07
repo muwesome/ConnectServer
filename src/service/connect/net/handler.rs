@@ -7,6 +7,7 @@ use crate::util::EventHandler;
 use futures::{future, Future, IntoFuture, Sink, Stream};
 use std::net::SocketAddr;
 use std::{sync::Arc, time::Duration};
+use tap::{TapOps, TapResultOps};
 use tokio::codec::Decoder;
 use tokio::net::TcpStream;
 use tokio::prelude::{FutureExt, StreamExt};
@@ -120,9 +121,9 @@ where
         .into_future()
         .and_then(|_| communicate)
         .then(move |result| {
-          result.err().map(|error| on_error.dispatch(error));
-          on_disconnect.dispatch(socket);
-          Ok(())
+          result
+            .tap_err(|error| on_error.dispatch_ref(error))
+            .tap(|_| on_disconnect.dispatch(socket))
         })
     });
 

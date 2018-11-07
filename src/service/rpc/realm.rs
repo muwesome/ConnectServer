@@ -1,9 +1,8 @@
-use super::proto;
+use super::{plugin::RealmEventPlugin, proto};
 use crate::state::{RealmServer, RealmServerId, RealmServerList};
-use crate::util::{CloseSignal, StreamExt};
+use crate::util::{CloseSignal, EventHandler, StreamExt};
 use futures::{Future, Stream};
 use grpcio::{ClientStreamingSink, RequestStream, RpcContext, RpcStatus, RpcStatusCode};
-use log::{error, info};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use try_from::TryFrom;
@@ -17,13 +16,40 @@ macro_rules! rpcerr {
 
 #[derive(Clone)]
 pub struct RealmRpc {
+  on_register: EventHandler<RealmServer>,
+  on_deregister: EventHandler<RealmServer>,
+  on_update: EventHandler<RealmServer>,
+  on_error: EventHandler<grpcio::Error>,
   close_rx: CloseSignal,
   realms: RealmServerList,
 }
 
 impl RealmRpc {
   pub fn new(realms: RealmServerList, close_rx: CloseSignal) -> Self {
-    RealmRpc { realms, close_rx }
+    RealmRpc {
+      on_register: EventHandler::new(),
+      on_deregister: EventHandler::new(),
+      on_update: EventHandler::new(),
+      on_error: EventHandler::new(),
+      realms,
+      close_rx,
+    }
+  }
+
+  pub fn register_plugin(&self, plugin: impl RealmEventPlugin) {
+    let plugin = Arc::new(plugin);
+    self
+      .on_register
+      .subscribe_fn(closet!([plugin] move |event| plugin.on_register(event)));
+    self
+      .on_update
+      .subscribe_fn(closet!([plugin] move |event| plugin.on_update(event)));
+    self
+      .on_deregister
+      .subscribe_fn(closet!([plugin] move |event| plugin.on_deregister(event)));
+    self
+      .on_error
+      .subscribe_fn(closet!([plugin] move |event| plugin.on_error(event)));
   }
 
   fn add_realm(
@@ -37,10 +63,9 @@ impl RealmRpc {
       .realms
       .add(realm)
       .map_err(|error| rpcerr!(InvalidArgument, "Realm registration failed: {}", error))?;
-    info!(
-      "Realm registered: {}",
-      *self.realms.get(realm_id).expect("Invalid realm state")
-    );
+    self
+      .on_register
+      .dispatch_ref(&*self.realms.get(realm_id).expect("Invalid realm state"));
     Ok(realm_id)
   }
 
@@ -55,7 +80,7 @@ impl RealmRpc {
       .map(|mut realm| {
         realm.clients = status.get_clients() as usize;
         realm.capacity = status.get_capacity() as usize;
-        info!("Realm updated: {}", *realm);
+        self.on_update.dispatch_ref(&*realm);
       }).map_err(|error| rpcerr!(InvalidArgument, "Realm update failed: {}", error))
   }
 
@@ -64,7 +89,8 @@ impl RealmRpc {
       .realms
       .remove(id)
       .map_err(|error| rpcerr!(Internal, "Realm deregister failed: {}", error))
-      .map(|realm| info!("Realm deregistered: {}", realm))
+      .map(|realm| self.on_deregister.dispatch_ref(&realm))?;
+    Ok(())
   }
 }
 
@@ -109,17 +135,13 @@ impl proto::RealmService for RealmRpc {
 
     let session = process_realm_updates
       // Check for a potential close signal
-      .select(this.close_rx.then(|_| Err(rpcerr!(Unavailable, "Shutting down"))))
+      .select(self.close_rx.clone().then(|_| Err(rpcerr!(Unavailable, "Shutting down"))))
       // Notify the client of the outcome
       .then(|result| match result {
         Ok(_) => sink.success(proto::RealmResult::new()),
         Err((error, _)) => sink.fail(error),
       })
-      .map_err(|error| {
-        if !matches!(error, grpcio::Error::RemoteStopped) {
-          error!("RPC sink: {}", error)
-        }
-      });
+      .map_err(move |error| { this.on_error.dispatch(error); });
 
     // Dispatch the session
     ctx.spawn(session);
