@@ -48,7 +48,7 @@ pub enum EventAction {
 }
 
 impl From<()> for EventAction {
-  fn from(_: ()) -> Self {
+  fn from(_unit: ()) -> Self {
     EventAction::Keep
   }
 }

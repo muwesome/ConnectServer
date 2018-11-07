@@ -1,4 +1,4 @@
-use crate::state::RealmBrowserError;
+use crate::state::RealmServerListError;
 use failure::Fail;
 use muonline_protocol::connect::Version;
 use std::io;
@@ -56,7 +56,7 @@ pub enum ServerError {
   InvalidPacket(#[fail(cause)] io::Error),
 
   #[fail(display = "Realm state error")]
-  RealmState(#[fail(cause)] RealmBrowserError),
+  RealmState(#[fail(cause)] RealmServerListError),
 }
 
 #[derive(Fail, Debug)]

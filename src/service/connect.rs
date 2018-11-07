@@ -1,7 +1,7 @@
 pub use self::config::ConnectServiceConfig;
 pub use self::error::ConnectServiceError;
 use crate::util::{CloseSignal, ThreadController};
-use crate::{state::RealmBrowser, Result};
+use crate::{state::RealmServerList, Result};
 use std::sync::Arc;
 
 mod config;
@@ -14,7 +14,7 @@ pub struct ConnectService(ThreadController);
 
 impl ConnectService {
   /// Spawns a new Connect Service instance.
-  pub fn spawn(config: Arc<impl ConnectServiceConfig>, realms: RealmBrowser) -> Self {
+  pub fn spawn(config: Arc<impl ConnectServiceConfig>, realms: RealmServerList) -> Self {
     let ctl = ThreadController::spawn(move |rx| Self::serve(&*config, realms, rx));
     ConnectService(ctl)
   }
@@ -36,7 +36,7 @@ impl ConnectService {
 
   fn serve(
     config: &impl ConnectServiceConfig,
-    realms: RealmBrowser,
+    realms: RealmServerList,
     close_rx: CloseSignal,
   ) -> Result<()> {
     // Maps incoming packets to server responses

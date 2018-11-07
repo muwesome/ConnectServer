@@ -1,6 +1,6 @@
 pub use self::config::RpcServiceConfig;
 use crate::util::{CloseSignal, ThreadController};
-use crate::{state::RealmBrowser, Result};
+use crate::{state::RealmServerList, Result};
 use failure::Fail;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
@@ -8,8 +8,8 @@ use log::info;
 use std::sync::Arc;
 
 mod config;
-mod listener;
 mod proto;
+mod realm;
 
 #[derive(Fail, Debug)]
 enum RpcServiceError {
@@ -28,7 +28,7 @@ pub struct RpcService(ThreadController);
 
 impl RpcService {
   /// Spawns a new RPC service instance.
-  pub fn spawn(config: Arc<impl RpcServiceConfig>, realms: RealmBrowser) -> Self {
+  pub fn spawn(config: Arc<impl RpcServiceConfig>, realms: RealmServerList) -> Self {
     grpcio::redirect_log();
     let ctl = ThreadController::spawn(move |rx| Self::serve(&*config, realms, rx));
     RpcService(ctl)
@@ -46,10 +46,10 @@ impl RpcService {
 
   fn serve(
     config: &impl RpcServiceConfig,
-    realms: RealmBrowser,
+    realms: RealmServerList,
     close_rx: CloseSignal,
   ) -> Result<()> {
-    let service = proto::create_realm_service(listener::RpcListener::new(realms, close_rx.clone()));
+    let service = proto::create_realm_service(realm::RealmRpc::new(realms, close_rx.clone()));
 
     let environment = Arc::new(Environment::new(1));
     let mut server = ServerBuilder::new(environment)

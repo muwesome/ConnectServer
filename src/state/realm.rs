@@ -1,7 +1,6 @@
 use chashmap::CHashMap;
 use failure::Fail;
-use std::{cell::RefCell, ops::DerefMut};
-use std::{fmt, sync::Arc};
+use std::{cell::RefCell, fmt, sync::Arc};
 
 /// A realm server identifier.
 pub type RealmServerId = u16;
@@ -33,7 +32,7 @@ impl fmt::Display for RealmServer {
 }
 
 #[derive(Fail, Debug)]
-pub enum RealmBrowserError {
+pub enum RealmServerListError {
   #[fail(display = "Non-unique realm ID")]
   DuplicateId,
 
@@ -42,49 +41,37 @@ pub enum RealmBrowserError {
 }
 
 #[derive(Clone)]
-pub struct RealmBrowser {
+pub struct RealmServerList {
   realms: Arc<CHashMap<RealmServerId, RealmServer>>,
 }
 
-impl RealmBrowser {
+impl RealmServerList {
   pub fn new() -> Self {
-    RealmBrowser {
+    RealmServerList {
       realms: Arc::new(CHashMap::new()),
     }
   }
 
-  pub fn add(&self, realm: RealmServer) -> Result<(), RealmBrowserError> {
+  pub fn add(&self, realm: RealmServer) -> Result<(), RealmServerListError> {
     if self.realms.contains_key(&realm.id) {
-      Err(RealmBrowserError::DuplicateId)?;
+      Err(RealmServerListError::DuplicateId)?;
     }
 
     self.realms.insert_new(realm.id, realm);
     Ok(())
   }
 
-  pub fn remove(&self, id: RealmServerId) -> Result<(), RealmBrowserError> {
+  pub fn remove(&self, id: RealmServerId) -> Result<RealmServer, RealmServerListError> {
     self
       .realms
       .remove(&id)
-      .ok_or(RealmBrowserError::InexistentId)?;
-    Ok(())
-  }
-
-  pub fn update<F>(&self, id: RealmServerId, mutator: F) -> Result<(), RealmBrowserError>
-  where
-    F: FnOnce(&mut RealmServer),
-  {
-    self
-      .realms
-      .get_mut(&id)
-      .map(|mut realm| mutator(&mut realm))
-      .ok_or(RealmBrowserError::InexistentId)
+      .ok_or(RealmServerListError::InexistentId)
   }
 
   pub fn for_each<F: FnMut(&RealmServer)>(&self, func: F) {
     let func = RefCell::new(func);
     self.realms.retain(|_, realm| {
-      func.borrow_mut().deref_mut()(&realm);
+      (&mut *func.borrow_mut())(&realm);
       true
     });
   }
@@ -92,8 +79,21 @@ impl RealmBrowser {
   pub fn get<'a>(
     &'a self,
     id: RealmServerId,
-  ) -> Result<impl std::ops::Deref<Target = RealmServer> + 'a, RealmBrowserError> {
-    self.realms.get(&id).ok_or(RealmBrowserError::InexistentId)
+  ) -> Result<impl std::ops::Deref<Target = RealmServer> + 'a, RealmServerListError> {
+    self
+      .realms
+      .get(&id)
+      .ok_or(RealmServerListError::InexistentId)
+  }
+
+  pub fn get_mut<'a>(
+    &'a self,
+    id: RealmServerId,
+  ) -> Result<impl std::ops::DerefMut<Target = RealmServer> + 'a, RealmServerListError> {
+    self
+      .realms
+      .get_mut(&id)
+      .ok_or(RealmServerListError::InexistentId)
   }
 
   pub fn len(&self) -> usize {
